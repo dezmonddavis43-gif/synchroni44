@@ -1,0 +1,6 @@
+# Reduce merge-conflict friction on frequently-updated generated/changelog artifacts.
+# Keep both entries when two branches append changelog notes concurrently.
+CHANGELOG.md merge=union
+
+# dist.zip is generated build output; prefer current branch on merge to avoid binary conflicts.
+dist.zip binary merge=ours

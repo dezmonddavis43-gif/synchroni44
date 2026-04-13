@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synchroni Demo UI</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">S</span>
+          <div>
+            <h1>Synchroni</h1>
+            <p>Demo Environment</p>
+          </div>
+        </div>
+
+        <nav id="primary-nav" class="nav-links"></nav>
+
+        <div class="sidebar-footer">
+          <p>Safe demo sandbox</p>
+          <small>Mock data only · No backend calls</small>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="muted">Interactive Product Walkthrough</p>
+            <h2 id="view-title">Dashboard</h2>
+          </div>
+          <button id="cta-button" class="btn btn-primary">Create Brief</button>
+        </header>
+
+        <section id="view-container" class="view-container"></section>
+      </main>
+    </div>
+
+    <template id="pill-template">
+      <span class="pill"></span>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
