@@ -37,39 +37,13 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
         return
       }
 
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
         .maybeSingle()
 
-      if (profileError) {
-        setError(profileError.message || 'Failed to fetch profile')
-        setLoading(false)
-        return
-      }
-
-      if (profile) {
-        onAuth({ ...data.user, ...profile })
-      } else {
-        const newProfile = {
-          id: data.user.id,
-          full_name: data.user.user_metadata?.full_name || email.split('@')[0],
-          role: data.user.user_metadata?.role || 'supervisor'
-        }
-        const { data: createdProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert(newProfile)
-          .select()
-          .single()
-
-        if (createError) {
-          setError(createError.message || 'Failed to create profile')
-          setLoading(false)
-          return
-        }
-        onAuth({ ...data.user, ...createdProfile })
-      }
+      onAuth({ ...data.user, role: profile?.role || 'supervisor', full_name: profile?.full_name || '' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in')
     } finally {

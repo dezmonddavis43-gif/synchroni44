@@ -103,7 +103,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
       .from('tracks')
       .select('*')
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .order('play_count', { ascending: false })
     if (data) setFilteredTracks(data as Track[])
     setLoading(false)
   }

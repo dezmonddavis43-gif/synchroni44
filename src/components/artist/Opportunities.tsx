@@ -54,8 +54,7 @@ export function Opportunities({ profile }: OpportunitiesProps) {
         .from('briefs')
         .select('*')
         .eq('is_private', false)
-        .in('status', ['open', 'published'])
-        .order('deadline', { ascending: true }),
+        .eq('status', 'open'),
 
       supabase
         .from('brief_submissions')
