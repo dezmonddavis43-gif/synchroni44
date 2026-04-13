@@ -37,7 +37,7 @@ export const MOOD_COLORS: Record<string, string> = {
   Melancholic: '#7B9CFF',
   Sensual: '#FF9C7B',
   Aggressive: '#FF4D4D',
-  Peaceful: '#4DFFDB',
+  Peaceful: '#4DDFFF',
   Cinematic: '#C8A97E',
   Mixed: '#888',
 }
@@ -55,3 +55,5 @@ export interface StudioProject {
   videoUrl: string | null
   syncVideo: boolean
 }
+
+export { Track }

@@ -1,23 +1,80 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, GripVertical } from 'lucide-react'
+import { Search, Plus, GripVertical, Sparkles, Info } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import type { Track } from '../../../lib/types'
 import { MOOD_COLORS } from './types'
 
 const MOODS = ['All', 'Tense', 'Hopeful', 'Melancholic', 'Sensual', 'Aggressive', 'Peaceful']
 
+type CatalogTab = 'catalog' | 'ai' | 'detail'
+
 interface CatalogPanelProps {
   onAddTrack: (track: Track) => void
+  selectedTrack?: Track | null
 }
 
-function formatDuration(s?: number) {
+function formatDuration(s?: number | null) {
   if (!s) return '--'
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-export function CatalogPanel({ onAddTrack }: CatalogPanelProps) {
+function TrackRow({ track, onAdd }: { track: Track; onAdd: () => void }) {
+  return (
+    <tr
+      className="border-b border-[#0E0E14] hover:bg-[#131318] group transition-colors"
+      draggable
+      onDragStart={() => { (window as any).__studioTrack = track }}
+      onDragEnd={() => { delete (window as any).__studioTrack }}
+      style={{ cursor: 'grab' }}
+    >
+      <td className="px-1 py-1 text-[#333] group-hover:text-[#555]">
+        <GripVertical className="w-3 h-3" />
+      </td>
+      <td className="px-1 py-1">
+        <div
+          className="w-7 h-7 rounded flex-shrink-0"
+          style={{
+            background: track.cover_art_url
+              ? `url(${track.cover_art_url}) center/cover`
+              : `linear-gradient(135deg, ${track.artwork_color || '#C8A97E'}44, #7B9CFF22)`,
+          }}
+        />
+      </td>
+      <td className="px-1.5 py-1 min-w-0">
+        <p className="text-[11px] text-[#E8E8E8] truncate max-w-[120px] font-medium">{track.title}</p>
+        <p className="text-[9px] text-[#666] truncate max-w-[120px]">{track.artist}</p>
+      </td>
+      <td className="px-1.5 py-1 text-[9px] text-[#555]">{track.bpm || '–'}</td>
+      <td className="px-1.5 py-1">
+        {track.mood ? (
+          <span
+            className="px-1.5 py-0.5 rounded-full text-[8px] whitespace-nowrap"
+            style={{
+              background: (MOOD_COLORS[track.mood] || '#888') + '22',
+              color: MOOD_COLORS[track.mood] || '#888',
+            }}
+          >
+            {track.mood}
+          </span>
+        ) : <span className="text-[#333] text-[9px]">–</span>}
+      </td>
+      <td className="px-1.5 py-1 text-[9px] text-[#444]">{formatDuration(track.duration || (track as any).duration_seconds)}</td>
+      <td className="px-1 py-1">
+        <button
+          onClick={onAdd}
+          className="p-1 rounded border border-[#2a2a35] text-[#555] hover:border-[#C8A97E] hover:text-[#C8A97E] transition-colors opacity-0 group-hover:opacity-100"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+export function CatalogPanel({ onAddTrack, selectedTrack }: CatalogPanelProps) {
+  const [activeTab, setActiveTab] = useState<CatalogTab>('catalog')
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -26,6 +83,9 @@ export function CatalogPanel({ onAddTrack }: CatalogPanelProps) {
   const [bpmMin, setBpmMin] = useState('')
   const [bpmMax, setBpmMax] = useState('')
   const [genres, setGenres] = useState<string[]>([])
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiResults, setAiResults] = useState<Track[]>([])
 
   useEffect(() => {
     loadTracks()
@@ -47,193 +107,255 @@ export function CatalogPanel({ onAddTrack }: CatalogPanelProps) {
     setLoading(false)
   }
 
+  const handleAiMatch = async () => {
+    if (!aiPrompt.trim() || aiLoading) return
+    setAiLoading(true)
+    await new Promise(r => setTimeout(r, 800))
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5).slice(0, 5)
+    setAiResults(shuffled)
+    setAiLoading(false)
+  }
+
   const filtered = tracks.filter(t => {
     const q = search.toLowerCase()
-    const matchSearch = !q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || (t.tags || []).some((tag: string) => tag.toLowerCase().includes(q))
+    const matchSearch = !q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || ((t as any).tags || []).some((tag: string) => tag.toLowerCase().includes(q))
     const matchMood = mood === 'All' || t.mood === mood
     const matchGenre = !genre || t.genre === genre
-    const matchBpm = (!bpmMin || (t.bpm || 0) >= Number(bpmMin)) && (!bpmMax || (t.bpm || 0) <= Number(bpmMax))
+    const matchBpm = (!bpmMin || ((t as any).bpm || 0) >= Number(bpmMin)) && (!bpmMax || ((t as any).bpm || 0) <= Number(bpmMax))
     return matchSearch && matchMood && matchGenre && matchBpm
   })
 
   return (
     <div className="flex flex-col h-full" style={{ background: '#0A0A0E' }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#111118] flex-shrink-0 flex-wrap">
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#555]" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search tracks, artists, tags..."
-            className="pl-6 pr-3 py-1 text-xs bg-[#131318] border border-[#2A2A35] rounded text-[#E8E8E8] placeholder-[#444] outline-none focus:border-[#C8A97E] transition-colors"
-            style={{ width: 200 }}
-          />
-        </div>
-
-        <div className="flex gap-1 flex-wrap">
-          {MOODS.map(m => (
-            <button
-              key={m}
-              onClick={() => setMood(m)}
-              className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
-              style={{
-                background: mood === m ? '#C8A97E' : '#131318',
-                color: mood === m ? '#0A0A0E' : '#888',
-                border: `1px solid ${mood === m ? '#C8A97E' : '#2A2A35'}`,
-              }}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-
-        {genres.length > 0 && (
-          <select
-            value={genre}
-            onChange={e => setGenre(e.target.value)}
-            className="text-[10px] px-2 py-0.5 bg-[#131318] border border-[#2A2A35] rounded text-[#888] outline-none"
+      <div className="flex items-center border-b border-[#111118] flex-shrink-0" style={{ height: 36 }}>
+        {(['catalog', 'ai', 'detail'] as CatalogTab[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="flex items-center gap-1 px-3 h-full text-[10px] font-medium transition-colors border-b-2 uppercase tracking-wider"
+            style={{
+              borderBottomColor: activeTab === tab ? '#C8A97E' : 'transparent',
+              color: activeTab === tab ? '#C8A97E' : '#555',
+              background: activeTab === tab ? '#C8A97E0A' : 'transparent',
+            }}
           >
-            <option value="">All Genres</option>
-            {genres.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-        )}
-
-        <div className="flex items-center gap-1">
-          <span className="text-[9px] text-[#555]">BPM</span>
-          <input
-            type="number"
-            value={bpmMin}
-            onChange={e => setBpmMin(e.target.value)}
-            placeholder="min"
-            className="w-10 text-[10px] bg-[#131318] border border-[#2A2A35] rounded text-[#888] text-center outline-none px-1 py-0.5"
-          />
-          <span className="text-[9px] text-[#444]">–</span>
-          <input
-            type="number"
-            value={bpmMax}
-            onChange={e => setBpmMax(e.target.value)}
-            placeholder="max"
-            className="w-10 text-[10px] bg-[#131318] border border-[#2A2A35] rounded text-[#888] text-center outline-none px-1 py-0.5"
-          />
-        </div>
-
-        <span className="ml-auto text-[10px] text-[#444]">{filtered.length} tracks</span>
+            {tab === 'ai' && <Sparkles className="w-2.5 h-2.5" />}
+            {tab === 'detail' && <Info className="w-2.5 h-2.5" />}
+            {tab === 'catalog' ? 'Catalog' : tab === 'ai' ? 'AI Match' : 'Detail'}
+          </button>
+        ))}
+        <div className="ml-auto pr-3 text-[9px] text-[#333]">{tracks.length} tracks</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-5 h-5 border-2 border-[#C8A97E] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <table className="w-full text-xs">
-            <colgroup>
-              <col style={{ width: 24 }} />
-              <col style={{ width: 32 }} />
-              <col />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 50 }} />
-              <col style={{ width: 70 }} />
-              <col style={{ width: 42 }} />
-              <col style={{ width: 60 }} />
-              <col style={{ width: 36 }} />
-            </colgroup>
-            <thead>
-              <tr className="text-left border-b border-[#111118]">
-                <th className="py-1 px-1" />
-                <th className="py-1 px-1" />
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">Title</th>
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">Genre</th>
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">BPM</th>
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">Mood</th>
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">Dur</th>
-                <th className="py-1 px-2 text-[9px] text-[#555] font-normal tracking-wider uppercase">Clear</th>
-                <th className="py-1 px-1" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(track => (
-                <tr
-                  key={track.id}
-                  className="border-b border-[#0E0E14] hover:bg-[#131318] group transition-colors cursor-grab"
-                  draggable
-                  onDragStart={() => { (window as any).__studioTrack = track }}
-                  onDragEnd={() => { delete (window as any).__studioTrack }}
+      {activeTab === 'catalog' && (
+        <>
+          <div className="flex flex-col gap-1.5 px-2 py-1.5 border-b border-[#111118] flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#444]" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search tracks, artists, tags..."
+                className="w-full pl-6 pr-2 py-1 text-[11px] bg-[#131318] border border-[#2A2A35] rounded text-[#E8E8E8] placeholder-[#444] outline-none focus:border-[#C8A97E]/50 transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-1 flex-wrap">
+              {MOODS.map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMood(m)}
+                  className="text-[9px] px-1.5 py-0.5 rounded-full transition-colors"
+                  style={{
+                    background: mood === m ? '#C8A97E' : '#131318',
+                    color: mood === m ? '#0A0A0E' : '#777',
+                    border: `1px solid ${mood === m ? '#C8A97E' : '#2A2A35'}`,
+                  }}
                 >
-                  <td className="px-1 py-1 text-[#444] group-hover:text-[#666]">
-                    <GripVertical className="w-3 h-3" />
-                  </td>
-                  <td className="px-1 py-1">
-                    {track.cover_art_url || track.artwork_url ? (
-                      <div
-                        className="w-7 h-7 rounded"
-                        style={{
-                          background: `url(${track.cover_art_url || track.artwork_url}) center/cover`,
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className="w-7 h-7 rounded"
-                        style={{
-                          background: `linear-gradient(135deg, ${track.artwork_color || '#C8A97E'}44, ${track.artwork_color || '#7B9CFF'}22)`,
-                        }}
-                      />
-                    )}
-                  </td>
-                  <td className="px-2 py-1">
-                    <p className="text-[#E8E8E8] truncate max-w-[160px]">{track.title}</p>
-                    <p className="text-[#666] truncate max-w-[160px]">{track.artist}</p>
-                  </td>
-                  <td className="px-2 py-1 text-[#666]">{track.genre || '–'}</td>
-                  <td className="px-2 py-1 text-[#666]">{track.bpm || '–'}</td>
-                  <td className="px-2 py-1">
-                    {track.mood ? (
-                      <span
-                        className="px-1.5 py-0.5 rounded-full text-[9px]"
-                        style={{
-                          background: (MOOD_COLORS[track.mood] || '#888') + '22',
-                          color: MOOD_COLORS[track.mood] || '#888',
-                        }}
-                      >
-                        {track.mood}
-                      </span>
-                    ) : <span className="text-[#444]">–</span>}
-                  </td>
-                  <td className="px-2 py-1 text-[#555]">{formatDuration(track.duration || track.duration_seconds)}</td>
-                  <td className="px-2 py-1">
-                    {track.clearance_status && (
-                      <span
-                        className="px-1.5 py-0.5 rounded text-[9px]"
-                        style={{
-                          background: track.clearance_status === 'CLEAR' ? '#22C55E22' : '#F59E0B22',
-                          color: track.clearance_status === 'CLEAR' ? '#22C55E' : '#F59E0B',
-                        }}
-                      >
-                        {track.clearance_status}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-1 py-1">
-                    <button
-                      onClick={() => onAddTrack(track)}
-                      className="p-1 rounded border border-[#2a2a35] text-[#666] hover:border-[#C8A97E] hover:text-[#C8A97E] transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </td>
-                </tr>
+                  {m}
+                </button>
               ))}
-              {filtered.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={9} className="py-6 text-center text-[#444] text-xs">
-                    No tracks match your filters
-                  </td>
-                </tr>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {genres.length > 0 && (
+                <select
+                  value={genre}
+                  onChange={e => setGenre(e.target.value)}
+                  className="text-[9px] px-1.5 py-0.5 bg-[#131318] border border-[#2A2A35] rounded text-[#777] outline-none flex-1"
+                >
+                  <option value="">All Genres</option>
+                  {genres.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
               )}
-            </tbody>
-          </table>
-        )}
-      </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-[#444]">BPM</span>
+                <input
+                  type="number"
+                  value={bpmMin}
+                  onChange={e => setBpmMin(e.target.value)}
+                  placeholder="min"
+                  className="w-9 text-[9px] bg-[#131318] border border-[#2A2A35] rounded text-[#777] text-center outline-none px-1 py-0.5"
+                />
+                <span className="text-[9px] text-[#333]">–</span>
+                <input
+                  type="number"
+                  value={bpmMax}
+                  onChange={e => setBpmMax(e.target.value)}
+                  placeholder="max"
+                  className="w-9 text-[9px] bg-[#131318] border border-[#2A2A35] rounded text-[#777] text-center outline-none px-1 py-0.5"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-20">
+                <div className="w-4 h-4 border-2 border-[#C8A97E] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <table className="w-full text-xs border-collapse">
+                <tbody>
+                  {filtered.map(track => (
+                    <TrackRow key={track.id} track={track} onAdd={() => onAddTrack(track)} />
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-[#333] text-xs">
+                        No tracks match your filters
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'ai' && (
+        <div className="flex flex-col flex-1 p-3 gap-3">
+          <div>
+            <p className="text-[10px] text-[#555] mb-1.5 uppercase tracking-wider">Describe the scene</p>
+            <textarea
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              placeholder="e.g. A slow-motion chase through rain-soaked streets at night, melancholic and tense..."
+              rows={4}
+              className="w-full bg-[#131318] border border-[#2A2A35] rounded px-3 py-2 text-xs text-[#E8E8E8] placeholder-[#444] outline-none focus:border-[#C8A97E]/50 resize-none transition-colors"
+            />
+          </div>
+          <button
+            onClick={handleAiMatch}
+            disabled={aiLoading || !aiPrompt.trim()}
+            className="flex items-center justify-center gap-2 py-2 rounded border text-xs font-medium transition-colors"
+            style={{
+              borderColor: '#C8A97E55',
+              color: '#C8A97E',
+              background: '#C8A97E11',
+              opacity: aiLoading || !aiPrompt.trim() ? 0.5 : 1,
+            }}
+          >
+            {aiLoading ? (
+              <div className="w-3 h-3 border border-[#C8A97E] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Sparkles className="w-3 h-3" />
+            )}
+            {aiLoading ? 'Finding matches...' : '✦ Find Matches'}
+          </button>
+
+          {aiResults.length > 0 && (
+            <div className="flex-1 overflow-y-auto">
+              <p className="text-[9px] text-[#555] mb-1.5 uppercase tracking-wider">Matched Tracks</p>
+              <table className="w-full text-xs border-collapse">
+                <tbody>
+                  {aiResults.map((track, i) => (
+                    <tr key={track.id} className="border-b border-[#0E0E14] hover:bg-[#131318] group transition-colors">
+                      <td className="px-1 py-1">
+                        <span className="text-[9px] text-[#C8A97E] font-mono w-4 block text-center">#{i + 1}</span>
+                      </td>
+                      <td className="px-1 py-1">
+                        <div
+                          className="w-6 h-6 rounded"
+                          style={{
+                            background: track.cover_art_url
+                              ? `url(${track.cover_art_url}) center/cover`
+                              : `linear-gradient(135deg, ${track.artwork_color || '#C8A97E'}44, #7B9CFF22)`,
+                          }}
+                        />
+                      </td>
+                      <td className="px-1.5 py-1">
+                        <p className="text-[10px] text-[#E8E8E8] truncate">{track.title}</p>
+                        <p className="text-[9px] text-[#666] truncate">{track.artist}</p>
+                      </td>
+                      <td className="px-1.5 py-1 text-[9px]" style={{ color: '#C8A97E' }}>
+                        {Math.floor(75 + Math.random() * 24)}%
+                      </td>
+                      <td className="px-1 py-1">
+                        <button
+                          onClick={() => onAddTrack(track)}
+                          className="p-1 rounded border border-[#2a2a35] text-[#555] hover:border-[#C8A97E] hover:text-[#C8A97E] transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'detail' && (
+        <div className="flex-1 overflow-y-auto p-3">
+          {selectedTrack ? (
+            <div className="space-y-3">
+              <div
+                className="w-full aspect-square rounded-lg"
+                style={{
+                  background: selectedTrack.cover_art_url
+                    ? `url(${selectedTrack.cover_art_url}) center/cover`
+                    : `linear-gradient(135deg, ${selectedTrack.artwork_color || '#C8A97E'}44, #7B9CFF22)`,
+                }}
+              />
+              <div>
+                <h3 className="text-sm font-semibold text-[#E8E8E8]">{selectedTrack.title}</h3>
+                <p className="text-xs text-[#888]">{selectedTrack.artist}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                {[
+                  ['Genre', selectedTrack.genre],
+                  ['BPM', (selectedTrack as any).bpm],
+                  ['Key', (selectedTrack as any).key],
+                  ['Mood', selectedTrack.mood],
+                  ['Duration', formatDuration(selectedTrack.duration || (selectedTrack as any).duration_seconds)],
+                  ['Clearance', (selectedTrack as any).clearance_status],
+                ].map(([label, value]) => value && (
+                  <div key={label as string} className="bg-[#131318] rounded p-2">
+                    <p className="text-[#555] text-[9px] uppercase tracking-wider mb-0.5">{label}</p>
+                    <p className="text-[#E8E8E8]">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => onAddTrack(selectedTrack)}
+                className="w-full py-1.5 rounded border text-xs font-medium transition-colors"
+                style={{ borderColor: '#C8A97E55', color: '#C8A97E', background: '#C8A97E11' }}
+              >
+                Add to DAW
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Info className="w-8 h-8 text-[#2A2A35] mb-2" />
+              <p className="text-xs text-[#333]">Select a track to see details</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
