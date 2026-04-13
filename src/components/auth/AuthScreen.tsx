@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Music2 } from 'lucide-react'
+import { Music2, Mail } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 interface AuthScreenProps {
@@ -17,6 +17,8 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirmPending, setConfirmPending] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState('')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,15 +28,39 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
   const switchMode = (m: 'signin' | 'signup') => {
     setMode(m)
     setError('')
+    setConfirmPending(false)
+  }
+
+  const friendlyError = (msg: string) => {
+    if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials'))
+      return 'Incorrect email or password. Please check your credentials and try again.'
+    if (msg.includes('Email not confirmed'))
+      return 'Please check your email and click the confirmation link before signing in.'
+    if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('User already registered'))
+      return 'An account with this email already exists. Try signing in instead.'
+    if (msg.includes('Password should be'))
+      return 'Password must be at least 6 characters.'
+    if (msg.includes('rate limit') || msg.includes('too many'))
+      return 'Too many attempts. Please wait a moment and try again.'
+    return msg
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setConfirmPending(false)
     setLoading(true)
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-      if (authError) throw authError
+      if (authError) {
+        if (authError.message.includes('Email not confirmed')) {
+          setConfirmPending(true)
+          setPendingEmail(email)
+          setLoading(false)
+          return
+        }
+        throw authError
+      }
       if (!data.user) throw new Error('Sign in failed')
 
       const { data: profile } = await supabase
@@ -48,15 +74,19 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
       } else {
         await supabase.from('profiles').upsert({
           id: data.user.id,
-          full_name: data.user.email?.split('@')[0] || 'User',
-          role: 'supervisor',
+          full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          role: data.user.user_metadata?.role || 'supervisor',
           onboarding_complete: false,
           plan: 'free',
         })
-        onAuth({ ...data.user, role: 'supervisor', full_name: data.user.email?.split('@')[0] || 'User' })
+        onAuth({
+          ...data.user,
+          role: data.user.user_metadata?.role || 'supervisor',
+          full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+        })
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
+      setError(friendlyError(err.message || 'Failed to sign in'))
     } finally {
       setLoading(false)
     }
@@ -65,6 +95,7 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setConfirmPending(false)
     setLoading(true)
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -72,27 +103,107 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
         password,
         options: { data: { full_name: fullName, role } },
       })
-      if (signUpError) throw signUpError
-      if (!data.user) throw new Error('Sign up failed')
 
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: fullName,
-        role,
-        onboarding_complete: false,
-        plan: 'free',
-      })
+      if (signUpError) {
+        if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists') || signUpError.message.includes('User already registered')) {
+          setError('An account with this email already exists.')
+          setLoading(false)
+          return
+        }
+        throw signUpError
+      }
 
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInError) throw signInError
-      if (!signInData.user) throw new Error('Sign in after sign up failed')
+      if (!data.user) throw new Error('Sign up failed — no user returned')
 
-      onAuth({ ...signInData.user, full_name: fullName, role })
+      if (data.session) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: fullName,
+          role,
+          onboarding_complete: false,
+          plan: 'free',
+        })
+        onAuth({ ...data.user, full_name: fullName, role })
+        return
+      }
+
+      if (data.user && !data.session) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: fullName,
+          role,
+          onboarding_complete: false,
+          plan: 'free',
+        })
+
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) {
+          if (signInError.message.includes('Email not confirmed')) {
+            setConfirmPending(true)
+            setPendingEmail(email)
+            setLoading(false)
+            return
+          }
+          throw signInError
+        }
+        if (signInData.user) {
+          onAuth({ ...signInData.user, full_name: fullName, role })
+          return
+        }
+
+        setConfirmPending(true)
+        setPendingEmail(email)
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to create account')
+      setError(friendlyError(err.message || 'Failed to create account'))
     } finally {
       setLoading(false)
     }
+  }
+
+  const resendConfirmation = async () => {
+    await supabase.auth.resend({ type: 'signup', email: pendingEmail })
+    setError('')
+  }
+
+  if (confirmPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#070709' }}>
+        <div
+          className="w-full max-w-[440px] rounded-2xl border p-8 text-center"
+          style={{ background: '#0D0D12', borderColor: '#1E1E22' }}
+        >
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: '#C8A97E18' }}
+          >
+            <Mail className="w-7 h-7" style={{ color: '#C8A97E' }} />
+          </div>
+          <h2 className="text-xl font-semibold text-[#E8E8E8] mb-2">Check your email</h2>
+          <p className="text-sm mb-1" style={{ color: '#888' }}>
+            We sent a confirmation link to
+          </p>
+          <p className="text-sm font-medium mb-6" style={{ color: '#C8A97E' }}>{pendingEmail}</p>
+          <p className="text-xs mb-6" style={{ color: '#555' }}>
+            Click the link in the email to verify your account, then come back here to sign in.
+          </p>
+          <button
+            onClick={resendConfirmation}
+            className="text-xs underline mb-4 block mx-auto"
+            style={{ color: '#C8A97E' }}
+          >
+            Resend confirmation email
+          </button>
+          <button
+            onClick={() => { setConfirmPending(false); setMode('signin') }}
+            className="w-full py-3 rounded-xl font-semibold text-sm"
+            style={{ background: '#C8A97E', color: '#0A0A0C' }}
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -118,11 +229,7 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
               key={m}
               onClick={() => switchMode(m)}
               className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
-              style={
-                mode === m
-                  ? { background: '#C8A97E', color: '#0A0A0C' }
-                  : { color: '#666' }
-              }
+              style={mode === m ? { background: '#C8A97E', color: '#0A0A0C' } : { color: '#666' }}
             >
               {m === 'signin' ? 'Sign In' : 'Sign Up'}
             </button>
@@ -132,6 +239,15 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
         {error && (
           <div className="mb-4 rounded-lg p-3" style={{ background: '#FF4D4D12', border: '1px solid #FF4D4D30' }}>
             <p className="text-sm" style={{ color: '#FF6B6B' }}>{error}</p>
+            {error.includes('already exists') && (
+              <button
+                onClick={() => switchMode('signin')}
+                className="text-xs mt-2 underline"
+                style={{ color: '#C8A97E' }}
+              >
+                Sign in instead
+              </button>
+            )}
           </div>
         )}
 
@@ -188,7 +304,7 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2"
             style={{
               background: '#C8A97E',
               color: '#0A0A0C',
@@ -211,7 +327,7 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
           {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
           <button
             onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-            className="underline transition-colors"
+            className="underline"
             style={{ color: '#C8A97E' }}
           >
             {mode === 'signin' ? 'Sign up' : 'Sign in'}
