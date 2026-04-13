@@ -36,27 +36,33 @@ import { AdminPanel } from './components/admin/AdminPanel'
 import { PitchTracker } from './components/shared/PitchTracker'
 import { ArtistProfilePage } from './components/shared/ArtistProfilePage'
 
-const tabsByRole: Record<Profile['role'], string[]> = {
+const DEFAULT_TAB: Record<string, string> = {
+  supervisor: 'search',
+  artist: 'my-catalog',
+  label: 'catalog-search',
+  admin: 'search',
+}
+
+const tabsByRole: Record<string, string[]> = {
   supervisor: ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'messages', '111-collective'],
   artist: ['my-catalog', 'upload', 'opportunities', 'ai-pitch', 'pitch-tracker', 'earnings', 'messages'],
   label: ['catalog-search', 'upload', 'label-briefs', 'ai-pitch', 'response-builder', 'pitch-tracker', 'earnings', 'messages', '111-collective'],
-  admin: ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'my-catalog', 'upload', 'opportunities', 'ai-pitch', 'catalog-search', 'label-briefs', 'response-builder', 'pitch-tracker', 'earnings', 'messages', 'admin', '111-collective']
+  admin: ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'my-catalog', 'upload', 'opportunities', 'ai-pitch', 'catalog-search', 'label-briefs', 'response-builder', 'pitch-tracker', 'earnings', 'messages', 'admin', '111-collective'],
 }
 
 function App() {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [viewingRole, setViewingRole] = useState<Profile['role']>('supervisor')
-  const [showPreviewBanner, setShowPreviewBanner] = useState(true)
+  const [viewingRole, setViewingRole] = useState<string>('supervisor')
   const [activeTab, setActiveTab] = useState('search')
   const [globalSearch, setGlobalSearch] = useState('')
   const [artistSlug, setArtistSlug] = useState<string | null>(null)
-  const [previousTab, setPreviousTab] = useState('search')
 
   const player = useAudioPlayer()
 
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 3000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(timeout)
       if (session?.user) {
@@ -65,18 +71,30 @@ function App() {
           .select('*')
           .eq('id', session.user.id)
           .maybeSingle()
+
         if (profile) {
-          setUser(profile as Profile)
-          setViewingRole(profile.role)
+          const p = profile as Profile
+          setUser(p)
+          setViewingRole(p.role)
+          setActiveTab(DEFAULT_TAB[p.role] || 'search')
         } else {
-          setUser({
+          await supabase.from('profiles').upsert({
+            id: session.user.id,
+            full_name: session.user.email?.split('@')[0] || 'User',
+            role: 'supervisor',
+            onboarding_complete: false,
+            plan: 'free',
+          })
+          const fallback: Profile = {
             id: session.user.id,
             email: session.user.email || '',
             full_name: session.user.email?.split('@')[0] || 'User',
             role: 'supervisor',
-            created_at: new Date().toISOString()
-          })
+            created_at: new Date().toISOString(),
+          }
+          setUser(fallback)
           setViewingRole('supervisor')
+          setActiveTab('search')
         }
       }
       setLoading(false)
@@ -90,44 +108,43 @@ function App() {
     const checkRoute = () => {
       const path = window.location.pathname
       const artistMatch = path.match(/^\/artist\/(.+)$/)
-      if (artistMatch) {
-        setArtistSlug(artistMatch[1])
-      } else {
-        setArtistSlug(null)
-      }
+      if (artistMatch) setArtistSlug(artistMatch[1])
+      else setArtistSlug(null)
     }
     checkRoute()
-    const handleNavigate = () => checkRoute()
-    window.addEventListener('app:navigate', handleNavigate)
-    window.addEventListener('popstate', handleNavigate)
+    window.addEventListener('app:navigate', checkRoute)
+    window.addEventListener('popstate', checkRoute)
     return () => {
-      window.removeEventListener('app:navigate', handleNavigate)
-      window.removeEventListener('popstate', handleNavigate)
+      window.removeEventListener('app:navigate', checkRoute)
+      window.removeEventListener('popstate', checkRoute)
     }
   }, [])
 
   const handleAuth = (authUser: any) => {
+    const role = authUser.role || 'supervisor'
     const profile: Profile = {
       id: authUser.id,
       email: authUser.email || '',
       full_name: authUser.full_name || authUser.email?.split('@')[0] || 'User',
-      role: authUser.role || 'supervisor',
-      created_at: authUser.created_at || new Date().toISOString()
+      role: role as Profile['role'],
+      created_at: authUser.created_at || new Date().toISOString(),
     }
     setUser(profile)
-    setViewingRole(profile.role)
+    setViewingRole(role)
+    setActiveTab(DEFAULT_TAB[role] || 'search')
   }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setViewingRole('supervisor')
+    setActiveTab('search')
     window.location.reload()
   }
 
-  const navigateToArtist = (slug: string) => {
-    setPreviousTab(activeTab)
-    setArtistSlug(slug)
-    window.history.pushState({}, '', `/artist/${encodeURIComponent(slug)}`)
+  const handleViewingRoleChange = (role: string) => {
+    setViewingRole(role)
+    setActiveTab(DEFAULT_TAB[role] || 'search')
   }
 
   const navigateBackFromArtist = () => {
@@ -135,18 +152,23 @@ function App() {
     window.history.pushState({}, '', '/')
   }
 
-  const allowedTabs = useMemo(() => new Set(tabsByRole[viewingRole]), [viewingRole])
+  const allowedTabs = useMemo(() => new Set(tabsByRole[viewingRole] || []), [viewingRole])
 
   useEffect(() => {
-    if (!allowedTabs.has(activeTab)) setActiveTab(tabsByRole[viewingRole][0])
+    if (!allowedTabs.has(activeTab)) {
+      setActiveTab(DEFAULT_TAB[viewingRole] || 'search')
+    }
   }, [activeTab, allowedTabs, viewingRole])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0C] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#070709' }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-2 border-[#C8A97E] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#888]">Loading...</p>
+          <div
+            className="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
+            style={{ borderColor: '#C8A97E', borderTopColor: 'transparent' }}
+          />
+          <p className="text-sm tracking-widest font-semibold" style={{ color: '#C8A97E' }}>SYNCHRONI</p>
         </div>
       </div>
     )
@@ -156,7 +178,8 @@ function App() {
     return <AuthScreen onAuth={handleAuth} />
   }
 
-  const previewProfile = { ...user, role: viewingRole } as Profile
+  const previewProfile = { ...user, role: viewingRole as Profile['role'] }
+  const isAdminPreviewing = user.role === 'admin' && viewingRole !== 'admin'
 
   const handlePlayTrack = (track: Track) => {
     if (player.currentTrack?.id === track.id) player.togglePlay()
@@ -191,21 +214,29 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070709] flex">
-      <Sidebar profile={user} viewingRole={viewingRole} activeTab={activeTab} onTabChange={setActiveTab} />
+    <div className="min-h-screen flex" style={{ background: '#070709' }}>
+      <Sidebar profile={user} viewingRole={viewingRole as Profile['role']} activeTab={activeTab} onTabChange={setActiveTab} />
       <div className="flex-1 flex flex-col min-w-0">
-        {user.role === 'admin' && showPreviewBanner && (
-          <div className="bg-[#C8A97E] text-[#0A0A0C] px-4 py-2 text-sm flex items-center justify-between">
-            <span>Admin Preview Mode - Viewing as {viewingRole[0].toUpperCase() + viewingRole.slice(1)}</span>
-            <button onClick={() => setShowPreviewBanner(false)}><X className='w-4 h-4' /></button>
+        {isAdminPreviewing && (
+          <div
+            className="flex items-center justify-between px-4 py-2 text-sm font-semibold flex-shrink-0"
+            style={{ background: '#C8A97E', color: '#0A0A0C' }}
+          >
+            <span>Admin Preview — Viewing as {viewingRole.charAt(0).toUpperCase() + viewingRole.slice(1)}</span>
+            <button
+              onClick={() => handleViewingRoleChange('admin')}
+              className="hover:opacity-70 transition-opacity"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
         <TopBar
           profile={user}
           searchQuery={globalSearch}
           onSearchChange={setGlobalSearch}
-          viewingRole={viewingRole}
-          onViewingRoleChange={(role) => { setViewingRole(role); setShowPreviewBanner(true) }}
+          viewingRole={viewingRole as Profile['role']}
+          onViewingRoleChange={handleViewingRoleChange}
           onSignOut={handleSignOut}
         />
         <main className="flex-1 overflow-hidden pb-[68px]">
@@ -223,8 +254,24 @@ function App() {
         </main>
       </div>
 
-      <NowPlayingBar currentTrack={player.currentTrack} playing={player.playing} onPlayPause={player.togglePlay} onSkipNext={player.skipNext} onSkipPrevious={player.skipPrevious} onToggleFavorite={player.toggleFavorite} isFavorite={player.isFavorite} onSeek={player.seek} onVolumeChange={player.setVolume} currentTime={player.currentTime} duration={player.duration} volume={player.volume} queue={player.queue} queueIndex={player.queueIndex} onSelectTrack={player.selectTrack} />
-      <MobileNav viewingRole={viewingRole} activeTab={activeTab} onTabChange={setActiveTab} />
+      <NowPlayingBar
+        currentTrack={player.currentTrack}
+        playing={player.playing}
+        onPlayPause={player.togglePlay}
+        onSkipNext={player.skipNext}
+        onSkipPrevious={player.skipPrevious}
+        onToggleFavorite={player.toggleFavorite}
+        isFavorite={player.isFavorite}
+        onSeek={player.seek}
+        onVolumeChange={player.setVolume}
+        currentTime={player.currentTime}
+        duration={player.duration}
+        volume={player.volume}
+        queue={player.queue}
+        queueIndex={player.queueIndex}
+        onSelectTrack={player.selectTrack}
+      />
+      <MobileNav viewingRole={viewingRole as Profile['role']} activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   )
 }

@@ -1,41 +1,41 @@
 import { useState } from 'react'
+import { Music2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { Btn, Input, Select, Card } from '../shared/UI'
-import { Music2, ArrowRight } from 'lucide-react'
 
 interface AuthScreenProps {
   onAuth: (user: any) => void
 }
 
+const ROLE_OPTIONS = [
+  { value: 'supervisor', label: 'Music Supervisor' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'label', label: 'Label / Publisher' },
+  { value: 'admin', label: 'Admin' },
+]
+
 export function AuthScreen({ onAuth }: AuthScreenProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [existingEmailError, setExistingEmailError] = useState(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState<'supervisor' | 'artist' | 'label' | 'admin'>('supervisor')
+  const [role, setRole] = useState('supervisor')
+
+  const switchMode = (m: 'signin' | 'signup') => {
+    setMode(m)
+    setError('')
+  }
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (authError) {
-        setError(authError.message || 'Failed to sign in')
-        setLoading(false)
-        return
-      }
-      if (!data.user) {
-        setError('No authenticated user returned from sign in')
-        setLoading(false)
-        return
-      }
+      if (authError) throw authError
+      if (!data.user) throw new Error('Sign in failed')
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -43,9 +43,20 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
         .eq('id', data.user.id)
         .maybeSingle()
 
-      onAuth({ ...data.user, role: profile?.role || 'supervisor', full_name: profile?.full_name || '' })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign in')
+      if (profile) {
+        onAuth({ ...data.user, full_name: profile.full_name, role: profile.role })
+      } else {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: data.user.email?.split('@')[0] || 'User',
+          role: 'supervisor',
+          onboarding_complete: false,
+          plan: 'free',
+        })
+        onAuth({ ...data.user, role: 'supervisor', full_name: data.user.email?.split('@')[0] || 'User' })
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in')
     } finally {
       setLoading(false)
     }
@@ -54,143 +65,185 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setExistingEmailError(false)
     setLoading(true)
-
     try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName, role }
-        }
+        options: { data: { full_name: fullName, role } },
       })
+      if (signUpError) throw signUpError
+      if (!data.user) throw new Error('Sign up failed')
 
-      if (signUpError) {
-        if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
-          setExistingEmailError(true)
-          setError('An account with this email already exists.')
-          setLoading(false)
-          return
-        }
-        throw signUpError
-      }
-      if (!signUpData.user) throw new Error('Sign up failed')
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        full_name: fullName,
+        role,
+        onboarding_complete: false,
+        plan: 'free',
+      })
 
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
       if (signInError) throw signInError
-      if (!signInData.user) throw new Error('Sign in failed after sign up')
+      if (!signInData.user) throw new Error('Sign in after sign up failed')
 
-      const newProfile = {
-        id: signInData.user.id,
-        full_name: fullName || signInData.user.user_metadata?.full_name || '',
-        role
-      }
-
-      const { data: createdProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert(newProfile)
-        .select()
-        .single()
-
-      if (createError) throw createError
-      onAuth({ ...signInData.user, ...createdProfile })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign up')
+      onAuth({ ...signInData.user, full_name: fullName, role })
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0C] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 bg-[#0D0D10]">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#070709' }}>
+      <div
+        className="w-full max-w-[440px] rounded-2xl border p-8"
+        style={{ background: '#0D0D12', borderColor: '#1E1E22' }}
+      >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#C8A97E]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Music2 className="w-8 h-8 text-[#C8A97E]" />
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+            style={{ background: '#C8A97E18' }}
+          >
+            <Music2 className="w-7 h-7" style={{ color: '#C8A97E' }} />
           </div>
-          <h1 className="font-display text-3xl font-semibold text-[#E8E8E8] mb-2">SYNCHRONI</h1>
-          <p className="text-[#666] text-sm">Sync Intelligence</p>
+          <h1 className="text-2xl font-semibold tracking-widest text-[#E8E8E8]">SYNCHRONI</h1>
+          <p className="text-sm mt-1" style={{ color: '#C8A97E' }}>Sync Intelligence</p>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => { setMode('signin'); setError(''); setExistingEmailError(false) }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-              mode === 'signin' ? 'bg-[#C8A97E] text-[#0A0A0C]' : 'bg-[#1A1A1E] text-[#888] hover:text-[#E8E8E8]'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => { setMode('signup'); setError(''); setExistingEmailError(false) }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-              mode === 'signup' ? 'bg-[#C8A97E] text-[#0A0A0C]' : 'bg-[#1A1A1E] text-[#888] hover:text-[#E8E8E8]'
-            }`}
-          >
-            Sign Up
-          </button>
+        <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: '#13131A' }}>
+          {(['signin', 'signup'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
+              style={
+                mode === m
+                  ? { background: '#C8A97E', color: '#0A0A0C' }
+                  : { color: '#666' }
+              }
+            >
+              {m === 'signin' ? 'Sign In' : 'Sign Up'}
+            </button>
+          ))}
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
-            <p className="text-red-400 text-sm">{error}</p>
-            {existingEmailError && (
-              <button
-                type="button"
-                onClick={() => { setMode('signin'); setError(''); setExistingEmailError(false) }}
-                className="mt-2 flex items-center gap-1 text-[#C8A97E] text-sm font-medium hover:text-[#D4B88A] transition-colors"
-              >
-                Sign in instead? <ArrowRight className="w-3 h-3" />
-              </button>
-            )}
+          <div className="mb-4 rounded-lg p-3" style={{ background: '#FF4D4D12', border: '1px solid #FF4D4D30' }}>
+            <p className="text-sm" style={{ color: '#FF6B6B' }}>{error}</p>
           </div>
         )}
 
         <form onSubmit={mode === 'signin' ? handleSignIn : handleSignUp} className="space-y-4">
           {mode === 'signup' && (
             <>
-              <Input
-                label="Full Name"
-                type="text"
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-                placeholder="John Doe"
-                required
-              />
-              <Select label="Role" value={role} onChange={e => setRole(e.target.value as typeof role)}>
-                <option value="supervisor">Client / Music Supervisor</option>
-                <option value="artist">Creator / Rights Holder</option>
-                <option value="label">Label</option>
-                <option value="admin">Admin</option>
-              </Select>
+              <Field label="Full Name">
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="Jane Smith"
+                  required
+                  className="auth-input"
+                />
+              </Field>
+              <Field label="Role">
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value)}
+                  className="auth-input"
+                >
+                  {ROLE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </Field>
             </>
           )}
 
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-          />
+          <Field label="Email">
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              className="auth-input"
+            />
+          </Field>
 
-          <Input
-            label="Password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="********"
-            required
-            minLength={6}
-          />
+          <Field label="Password">
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={6}
+              className="auth-input"
+            />
+          </Field>
 
-          <Btn type="submit" disabled={loading} className="w-full">
-            {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
-          </Btn>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2"
+            style={{
+              background: '#C8A97E',
+              color: '#0A0A0C',
+              opacity: loading ? 0.75 : 1,
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-[#0A0A0C] border-t-transparent rounded-full animate-spin" />
+                {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
+              </>
+            ) : (
+              mode === 'signin' ? 'Sign In' : 'Create Account'
+            )}
+          </button>
         </form>
-      </Card>
+
+        <p className="text-center text-xs mt-5" style={{ color: '#444' }}>
+          {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+          <button
+            onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+            className="underline transition-colors"
+            style={{ color: '#C8A97E' }}
+          >
+            {mode === 'signin' ? 'Sign up' : 'Sign in'}
+          </button>
+        </p>
+      </div>
+
+      <style>{`
+        .auth-input {
+          width: 100%;
+          background: #0A0A10;
+          border: 1px solid #2A2A35;
+          border-radius: 10px;
+          padding: 10px 14px;
+          font-size: 14px;
+          color: #E8E8E8;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+        .auth-input::placeholder { color: #444; }
+        .auth-input:focus { border-color: #C8A97E; }
+        .auth-input option { background: #13131A; }
+      `}</style>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium" style={{ color: '#888' }}>{label}</label>
+      {children}
     </div>
   )
 }
