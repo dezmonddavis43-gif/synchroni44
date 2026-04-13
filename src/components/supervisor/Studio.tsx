@@ -99,7 +99,13 @@ export function Studio({ profile }: StudioProps) {
   const [dawTracks, setDawTracks] = useState<DAWTrack[]>([])
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
+  const [videoVolume, setVideoVolume] = useState(1)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  const handleVideoVolumeChange = useCallback((v: number) => {
+    setVideoVolume(v)
+    if (videoRef.current) videoRef.current.volume = v
+  }, [])
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true)
@@ -194,6 +200,8 @@ export function Studio({ profile }: StudioProps) {
             onSeek={handleSeek}
             onSkip={handleSkip}
             videoRef={videoRef}
+            videoVolume={videoVolume}
+            onVideoVolumeChange={handleVideoVolumeChange}
           />
         </div>
       </div>
