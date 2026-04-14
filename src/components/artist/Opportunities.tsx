@@ -22,12 +22,12 @@ interface Submission {
 type TabType = 'briefs' | 'submissions'
 type BriefFilter = 'all' | 'open' | 'closing-soon'
 type SubmissionFilter = 'all' | 'submitted' | 'in_review' | 'shortlisted' | 'selected' | 'licensed' | 'rejected'
-const SEEDED_BRIEFS: Brief[] = [
-  { id: 'seed-1', title: 'Global Sports Campaign', description: 'High-energy anthem for playoff promos.', mood: 'Aggressive', genre: 'Hip-Hop', is_private: false, supervisor_id: 'demo', status: 'open', created_at: new Date().toISOString() },
-  { id: 'seed-2', title: 'Luxury Auto Spot', description: 'Cinematic tension with premium feel.', mood: 'Cinematic', genre: 'Electronic', is_private: false, supervisor_id: 'demo', status: 'open', created_at: new Date().toISOString() },
-  { id: 'seed-3', title: 'Streaming Drama Teaser', description: 'Dark emotional arc.', mood: 'Melancholic', genre: 'Alternative', is_private: false, supervisor_id: 'demo', status: 'published', created_at: new Date().toISOString() },
-  { id: 'seed-4', title: 'Lifestyle Brand UGC', description: 'Hopeful, feel-good cue.', mood: 'Hopeful', genre: 'Pop', is_private: false, supervisor_id: 'demo', status: 'open', created_at: new Date().toISOString() },
-  { id: 'seed-5', title: 'Documentary Series', description: 'Organic, reflective underscore.', mood: 'Nostalgic', genre: 'Ambient', is_private: false, supervisor_id: 'demo', status: 'open', created_at: new Date().toISOString() }
+const DEMO_BRIEFS: Brief[] = [
+  { id: 'demo-nike', title: 'Nike — Summer Energy', description: 'Stadium-ready anthem for global sports retail.', mood: 'Aggressive', genre: 'Hip-Hop', bpm_min: 95, bpm_max: 130, budget: 250000, is_private: false, supervisor_id: 'demo', status: 'open', deadline: new Date(Date.now() + 14 * 86400000).toISOString(), created_at: new Date().toISOString() },
+  { id: 'demo-netflix', title: 'Netflix — Drama Teaser', description: 'Dark, emotional underscore for streaming promo.', mood: 'Melancholic', genre: 'Cinematic', bpm_min: 70, bpm_max: 100, budget: 180000, is_private: false, supervisor_id: 'demo', status: 'open', deadline: new Date(Date.now() + 21 * 86400000).toISOString(), created_at: new Date().toISOString() },
+  { id: 'demo-toyota', title: 'Toyota — Road Trip', description: 'Hopeful indie-pop for automotive campaign.', mood: 'Hopeful', genre: 'Indie Pop', bpm_min: 100, bpm_max: 120, budget: 120000, is_private: false, supervisor_id: 'demo', status: 'open', deadline: new Date(Date.now() + 10 * 86400000).toISOString(), created_at: new Date().toISOString() },
+  { id: 'demo-hbo', title: 'HBO — Documentary Series', description: 'Organic, reflective score beds.', mood: 'Nostalgic', genre: 'Ambient', bpm_min: 60, bpm_max: 90, budget: 95000, is_private: false, supervisor_id: 'demo', status: 'open', deadline: new Date(Date.now() + 30 * 86400000).toISOString(), created_at: new Date().toISOString() },
+  { id: 'demo-tacobell', title: 'Taco Bell — Late Night Fun', description: 'Playful, quirky cues for QSR social.', mood: 'Sensual', genre: 'Pop', bpm_min: 105, bpm_max: 125, budget: 75000, is_private: false, supervisor_id: 'demo', status: 'open', deadline: new Date(Date.now() + 7 * 86400000).toISOString(), created_at: new Date().toISOString() },
 ] as Brief[]
 
 export function Opportunities({ profile }: OpportunitiesProps) {
@@ -54,7 +54,8 @@ export function Opportunities({ profile }: OpportunitiesProps) {
         .from('briefs')
         .select('*')
         .eq('is_private', false)
-        .eq('status', 'open'),
+        .eq('status', 'open')
+        .order('created_at', { ascending: false }),
 
       supabase
         .from('brief_submissions')
@@ -73,7 +74,7 @@ export function Opportunities({ profile }: OpportunitiesProps) {
         .eq('status', 'active')
     ])
 
-    setBriefs((briefsResult.data && briefsResult.data.length > 0 ? briefsResult.data : SEEDED_BRIEFS))
+    setBriefs(briefsResult.data && briefsResult.data.length > 0 ? (briefsResult.data as Brief[]) : DEMO_BRIEFS)
     setSubmissions(submissionsResult.data || [])
     setTracks(tracksResult.data || [])
     setLoading(false)

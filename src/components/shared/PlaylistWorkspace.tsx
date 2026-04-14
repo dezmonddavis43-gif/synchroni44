@@ -105,36 +105,36 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     const { data: authData } = await supabase.auth.getUser()
     const userId = authData.user?.id ?? profile.id
 
-    const [ownPlaylistsRes, projectsRes, savedRes] = await Promise.all([
-      supabase.from('playlists').select('*').eq('owner_id', userId).order('created_at', { ascending: false }).limit(12),
-      supabase.from('projects').select('*').eq('owner_id', userId).order('name'),
-      supabase.from('saved_tracks').select('track_id').eq('user_id', userId)
+    const [playlistsRes, projectsRes, savedRes] = await Promise.all([
+      supabase
+        .from('playlists')
+        .select('*, playlist_tracks(*, track:tracks(*))')
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(12),
+      supabase.from('projects').select('*').eq('supervisor_id', userId).order('name'),
+      supabase.from('saved_tracks').select('track_id').eq('user_id', userId),
     ])
 
-    if (projectsRes.data) setProjects(projectsRes.data)
+    if (projectsRes.data) setProjects(projectsRes.data as Project[])
     if (savedRes.data) setSavedTracks(new Set(savedRes.data.map(s => s.track_id)))
 
-    if (ownPlaylistsRes.data) {
-      const columnsData = await Promise.all(
-        ownPlaylistsRes.data.map(async (playlist) => {
-          const { data: tracks } = await supabase
-            .from('playlist_tracks')
-            .select('*, track:tracks(*)')
-            .eq('playlist_id', playlist.id)
-            .order('position')
-
-          const project = projectsRes.data?.find(p => p.id === playlist.project_id)
-          const totalDuration = (tracks || []).reduce((sum, pt) => sum + (pt.track?.duration || 0), 0)
-
-          return {
-            ...playlist,
-            tracks: tracks || [],
-            totalDuration,
-            project
-          } as PlaylistColumn
-        })
-      )
+    if (playlistsRes.data) {
+      const columnsData = playlistsRes.data.map(playlist => {
+        const raw = (playlist as unknown as { playlist_tracks?: PlaylistTrackWithFolder[] }).playlist_tracks || []
+        const tracks = [...raw].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        const project = projectsRes.data?.find(p => p.id === playlist.project_id)
+        const totalDuration = tracks.reduce((sum, pt) => sum + (pt.track?.duration || 0), 0)
+        return {
+          ...playlist,
+          tracks,
+          totalDuration,
+          project,
+        } as PlaylistColumn
+      })
       setColumns(columnsData)
+    } else {
+      setColumns([])
     }
 
     setLoading(false)
@@ -385,7 +385,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     }
   }
 
-  const createFolder = async (_playlistId: string) => {
+  const createFolder = async () => {
     if (!newFolderName.trim()) return
     setShowNewFolderInput(null)
     setNewFolderName('')
@@ -492,16 +492,19 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.preventDefault()
                   e.stopPropagation()
                   setDragOverColumnId(null)
-                  const rawData = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
-                  let trackData: Track | null = null
-                  try {
-                    trackData = JSON.parse(rawData) as Track
-                  } catch (err) {
-                    trackData = draggedTrack || window.__draggedTrack || null
+                  const id = e.dataTransfer.getData('text/plain')
+                  let trackData: Track | null = draggedTrack || window.__draggedTrack || null
+                  if (id && (!trackData || trackData.id !== id)) {
+                    trackData = catalogTracks.find(t => t.id === id) || null
                   }
-                  if (trackData) {
-                    await addTrackToPlaylist(column.id, trackData)
+                  if (!trackData) {
+                    try {
+                      trackData = JSON.parse(e.dataTransfer.getData('application/json')) as Track
+                    } catch {
+                      trackData = null
+                    }
                   }
+                  if (trackData) await addTrackToPlaylist(column.id, trackData)
                   setDraggedTrack(null)
                   window.__draggedTrack = undefined
                 }}
@@ -626,7 +629,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                         placeholder="Section name"
                         className="flex-1 bg-[#0A0A0C] border border-[#2A2A2E] rounded px-2 py-1 text-xs text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
                         onKeyDown={e => {
-                          if (e.key === 'Enter') createFolder(column.id)
+                          if (e.key === 'Enter') void createFolder()
                           if (e.key === 'Escape') { setShowNewFolderInput(null); setNewFolderName('') }
                         }}
                         autoFocus
@@ -726,18 +729,21 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.preventDefault()
                   e.stopPropagation()
                   setDragOverAddButton(false)
-                  const rawData = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain')
-                  let trackData: Track | null = null
-                  try {
-                    trackData = JSON.parse(rawData) as Track
-                  } catch (err) {
-                    trackData = draggedTrack || window.__draggedTrack || null
+                  const id = e.dataTransfer.getData('text/plain')
+                  let trackData: Track | null = draggedTrack || window.__draggedTrack || null
+                  if (id && (!trackData || trackData.id !== id)) {
+                    trackData = catalogTracks.find(t => t.id === id) || null
+                  }
+                  if (!trackData) {
+                    try {
+                      trackData = JSON.parse(e.dataTransfer.getData('application/json')) as Track
+                    } catch {
+                      trackData = null
+                    }
                   }
                   if (trackData) {
                     const newPlaylist = await createPlaylist(trackData)
-                    if (newPlaylist) {
-                      await addTrackToPlaylist(newPlaylist.id, trackData)
-                    }
+                    if (newPlaylist) await addTrackToPlaylist(newPlaylist.id, trackData)
                   }
                   setDraggedTrack(null)
                   window.__draggedTrack = undefined
@@ -752,7 +758,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
       </div>
 
       <div
-        className={`h-1.5 flex-shrink-0 cursor-ns-resize transition-colors ${
+        className={`h-[6px] flex-shrink-0 cursor-ns-resize transition-colors ${
           isDraggingDivider ? 'bg-[#C8A97E]' : 'bg-[#1A1A1E] hover:bg-[#C8A97E]/50'
         }`}
         onMouseDown={handleDividerMouseDown}
@@ -1089,8 +1095,8 @@ function CatalogTrackRow({
         setIsDragging(true)
         onDragStartTrack(track)
         e.dataTransfer.effectAllowed = 'copy'
+        e.dataTransfer.setData('text/plain', track.id)
         e.dataTransfer.setData('application/json', JSON.stringify(trackData))
-        e.dataTransfer.setData('text/plain', JSON.stringify(trackData))
         window.__draggedTrack = track
       }}
       onDragEnd={() => {

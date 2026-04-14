@@ -43,11 +43,13 @@ const DEFAULT_TAB: Record<string, string> = {
   admin: 'search',
 }
 
+const SUPERVISOR_TABS = ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'messages', '111-collective'] as const
+
 const tabsByRole: Record<string, string[]> = {
-  supervisor: ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'messages', '111-collective'],
+  supervisor: [...SUPERVISOR_TABS],
   artist: ['my-catalog', 'upload', 'opportunities', 'ai-pitch', 'pitch-tracker', 'earnings', 'messages'],
-  label: ['catalog-search', 'upload', 'label-briefs', 'ai-pitch', 'response-builder', 'pitch-tracker', 'earnings', 'messages', '111-collective'],
-  admin: ['search', 'ai-match', 'studio', 'playlists', 'projects', 'briefs', 'inbox', 'hitlist', 'licensing', 'my-catalog', 'upload', 'opportunities', 'ai-pitch', 'catalog-search', 'label-briefs', 'response-builder', 'pitch-tracker', 'earnings', 'messages', 'admin', '111-collective'],
+  label: ['catalog-search', 'upload', 'label-briefs', 'ai-pitch', 'response-builder', 'pitch-tracker', 'earnings', 'messages'],
+  admin: [...SUPERVISOR_TABS, 'admin'],
 }
 
 function App() {
@@ -61,47 +63,58 @@ function App() {
   const player = useAudioPlayer()
 
   useEffect(() => {
-    const timeout = setTimeout(() => setLoading(false), 3000)
+    let cancelled = false
+    const maxTimer = window.setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 3000)
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      clearTimeout(timeout)
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        if (cancelled) return
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle()
 
-        if (profile) {
-          const p = profile as Profile
-          setUser(p)
-          setViewingRole(p.role)
-          setActiveTab(DEFAULT_TAB[p.role] || 'search')
-        } else {
-          await supabase.from('profiles').upsert({
-            id: session.user.id,
-            full_name: session.user.email?.split('@')[0] || 'User',
-            role: 'supervisor',
-            onboarding_complete: false,
-            plan: 'free',
-          })
-          const fallback: Profile = {
-            id: session.user.id,
-            email: session.user.email || '',
-            full_name: session.user.email?.split('@')[0] || 'User',
-            role: 'supervisor',
-            created_at: new Date().toISOString(),
+          if (profile) {
+            const p = profile as Profile
+            setUser(p)
+            setViewingRole(p.role)
+            setActiveTab(DEFAULT_TAB[p.role] || 'search')
+          } else {
+            await supabase.from('profiles').upsert({
+              id: session.user.id,
+              full_name: session.user.email?.split('@')[0] || 'User',
+              role: 'supervisor',
+              onboarding_complete: false,
+              plan: 'free',
+            })
+            const fallback: Profile = {
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.email?.split('@')[0] || 'User',
+              role: 'supervisor',
+              created_at: new Date().toISOString(),
+            }
+            setUser(fallback)
+            setViewingRole('supervisor')
+            setActiveTab('search')
           }
-          setUser(fallback)
-          setViewingRole('supervisor')
-          setActiveTab('search')
         }
-      }
-      setLoading(false)
-    }).catch(() => {
-      clearTimeout(timeout)
-      setLoading(false)
-    })
+      })
+      .catch(() => {})
+      .finally(() => {
+        window.clearTimeout(maxTimer)
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(maxTimer)
+    }
   }, [])
 
   useEffect(() => {
@@ -120,14 +133,24 @@ function App() {
     }
   }, [])
 
-  const handleAuth = (authUser: any) => {
-    const role = authUser.role || 'supervisor'
+  const handleAuth = (authUser: {
+    id: string
+    email?: string
+    full_name?: string
+    role?: string
+    created_at?: string
+    onboarding_complete?: boolean
+    plan?: string
+  }) => {
+    const role = (authUser.role || 'supervisor') as Profile['role']
     const profile: Profile = {
       id: authUser.id,
       email: authUser.email || '',
       full_name: authUser.full_name || authUser.email?.split('@')[0] || 'User',
-      role: role as Profile['role'],
+      role,
       created_at: authUser.created_at || new Date().toISOString(),
+      onboarding_complete: authUser.onboarding_complete,
+      plan: authUser.plan,
     }
     setUser(profile)
     setViewingRole(role)
@@ -222,7 +245,7 @@ function App() {
             className="flex items-center justify-between px-4 py-2 text-sm font-semibold flex-shrink-0"
             style={{ background: '#C8A97E', color: '#0A0A0C' }}
           >
-            <span>Admin Preview — Viewing as {viewingRole.charAt(0).toUpperCase() + viewingRole.slice(1)}</span>
+            <span>Admin Preview: Viewing as {viewingRole.charAt(0).toUpperCase() + viewingRole.slice(1)}</span>
             <button
               onClick={() => handleViewingRoleChange('admin')}
               className="hover:opacity-70 transition-opacity"
@@ -257,19 +280,16 @@ function App() {
       <NowPlayingBar
         currentTrack={player.currentTrack}
         playing={player.playing}
-        onPlayPause={player.togglePlay}
-        onSkipNext={player.skipNext}
-        onSkipPrevious={player.skipPrevious}
-        onToggleFavorite={player.toggleFavorite}
-        isFavorite={player.isFavorite}
-        onSeek={player.seek}
-        onVolumeChange={player.setVolume}
-        currentTime={player.currentTime}
+        progress={player.progress}
         duration={player.duration}
         volume={player.volume}
-        queue={player.queue}
-        queueIndex={player.queueIndex}
-        onSelectTrack={player.selectTrack}
+        onTogglePlay={player.togglePlay}
+        onSeek={player.seek}
+        onVolumeChange={player.setVolume}
+        onPrevious={() => void player.playPrevious(user.id)}
+        onNext={() => void player.playNext(user.id)}
+        isFavorite={player.isFavorite}
+        onToggleFavorite={() => void player.toggleFavorite(user.id)}
       />
       <MobileNav viewingRole={viewingRole as Profile['role']} activeTab={activeTab} onTabChange={setActiveTab} />
     </div>

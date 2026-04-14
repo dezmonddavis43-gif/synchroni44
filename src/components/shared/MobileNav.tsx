@@ -31,10 +31,10 @@ const tabsByRole: Record<Profile['role'], { id: string; label: string }[]> = {
   admin: [
     { id: 'search', label: 'Search' },
     { id: 'studio', label: 'Studio' },
-    { id: 'ai-pitch', label: 'AI Pitch' },
-    { id: 'pitch-tracker', label: 'Tracker' },
-    { id: 'admin', label: 'Admin' }
-  ]
+    { id: 'playlists', label: 'Lists' },
+    { id: 'briefs', label: 'Briefs' },
+    { id: 'admin', label: 'Admin' },
+  ],
 }
 
 export function MobileNav({ viewingRole, activeTab, onTabChange }: MobileNavProps) {

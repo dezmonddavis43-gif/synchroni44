@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Search, Bell, User, ChevronDown, LogOut } from 'lucide-react'
+import { Search, Bell, ChevronDown, LogOut } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { RoleBadge } from './UI'
 import { ROLE_COLORS } from '../../lib/constants'
@@ -14,7 +14,12 @@ interface TopBarProps {
   onSignOut?: () => void
 }
 
-const VIEW_ROLES: Profile['role'][] = ['admin', 'supervisor', 'artist', 'label']
+const VIEW_ROLE_OPTIONS: { role: Profile['role']; label: string }[] = [
+  { role: 'admin', label: '👁 Admin' },
+  { role: 'supervisor', label: '🎬 Supervisor' },
+  { role: 'artist', label: '🎵 Artist' },
+  { role: 'label', label: '🏢 Label' },
+]
 
 export function TopBar({ profile, searchQuery, onSearchChange, viewingRole, onViewingRoleChange, onSignOut }: TopBarProps) {
   const [showDropdown, setShowDropdown] = useState(false)
@@ -69,8 +74,8 @@ export function TopBar({ profile, searchQuery, onSearchChange, viewingRole, onVi
             Viewing as: {viewingRole[0].toUpperCase() + viewingRole.slice(1)} <ChevronDown className="w-3 h-3 inline ml-1" />
           </button>
           {showRoleMenu && (
-            <div className="absolute right-0 mt-2 w-40 rounded-lg border border-[#2A2A2E] bg-[#13131A] z-50 py-1">
-              {VIEW_ROLES.map(role => (
+            <div className="absolute right-0 mt-2 w-52 rounded-lg border border-[#2A2A2E] bg-[#13131A] z-50 py-1">
+              {VIEW_ROLE_OPTIONS.map(({ role, label }) => (
                 <button
                   key={role}
                   onClick={() => {
@@ -79,7 +84,7 @@ export function TopBar({ profile, searchQuery, onSearchChange, viewingRole, onVi
                   }}
                   className={`w-full text-left px-3 py-2 text-sm ${viewingRole === role ? 'text-[#C8A97E] bg-[#C8A97E]/10' : 'text-[#CFCFD2] hover:bg-[#1D1D25]'}`}
                 >
-                  {role[0].toUpperCase() + role.slice(1)}
+                  {label}
                 </button>
               ))}
             </div>

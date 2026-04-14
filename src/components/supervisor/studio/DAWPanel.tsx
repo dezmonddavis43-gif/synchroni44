@@ -72,6 +72,8 @@ export function DAWPanel({
   videoVolume,
   onVideoVolumeChange,
 }: DAWPanelProps) {
+  void currentTime
+  void videoRef
   const audioCtxRef = useRef<AudioContext | null>(null)
   const sourceRefs = useRef<Map<string, AudioBufferSourceNode>>(new Map())
   const gainRefs = useRef<Map<string, GainNode>>(new Map())

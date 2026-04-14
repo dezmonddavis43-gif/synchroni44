@@ -30,6 +30,7 @@ interface ArtistData {
 }
 
 export function LabelPage({ profile, onPlayTrack, currentTrack, playing, onNavigateBack }: LabelPageProps) {
+  void profile
   const [loading, setLoading] = useState(true)
   const [artists, setArtists] = useState<ArtistData[]>([])
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null)

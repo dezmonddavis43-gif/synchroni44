@@ -87,7 +87,7 @@ export function Earnings({ profile }: EarningsProps) {
               </div>
             </div>
             <p className="text-2xl md:text-3xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.label.totalLicensedValue)}</p>
-            <p className="text-xs text-[#666] mt-1">Total Licensed Value</p>
+            <p className="text-xs text-[#666] mt-1">Total Licensed</p>
           </Card>
 
           <Card className="p-4">

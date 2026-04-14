@@ -22,7 +22,7 @@ type StatusTab = 'all' | 'active' | 'review' | 'rejected' | 'draft'
 const STATUS_TABS: { id: StatusTab; label: string; color: string }[] = [
   { id: 'all', label: 'All', color: '#888' },
   { id: 'active', label: 'Active', color: '#4DFFB4' },
-  { id: 'review', label: 'Pending Review', color: '#FFD700' },
+  { id: 'review', label: 'Pending', color: '#FFD700' },
   { id: 'rejected', label: 'Rejected', color: '#FF4D4D' },
   { id: 'draft', label: 'Draft', color: '#666' }
 ]

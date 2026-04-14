@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Search, Sparkles, Clapperboard, ListMusic, FolderKanban, FileText, Inbox, Star, Scale, MessageSquare, Music2, Upload, DollarSign, Settings, Disc3 } from 'lucide-react'
-import { RoleBadge } from './UI'
 import type { Profile } from '../../lib/types'
 import { ROLE_COLORS } from '../../lib/constants'
 
@@ -19,7 +18,7 @@ const supervisorSections: NavSection[] = [
   { label: 'WORK', items: [{ id: 'studio', label: '🎬 Studio', icon: <Clapperboard className='w-4 h-4' /> }, { id: 'playlists', label: '♫ Playlists', icon: <ListMusic className='w-4 h-4' /> }] },
   { label: 'PIPELINE', items: [{ id: 'projects', label: '⊞ Projects', icon: <FolderKanban className='w-4 h-4' /> }, { id: 'briefs', label: '📋 Briefs', icon: <FileText className='w-4 h-4' /> }, { id: 'inbox', label: '📥 Inbox', icon: <Inbox className='w-4 h-4' /> }, { id: 'hitlist', label: '★ Hit List', icon: <Star className='w-4 h-4' /> }] },
   { label: 'LICENSE', items: [{ id: 'licensing', label: '⚖ Licensing', icon: <Scale className='w-4 h-4' /> }, { id: 'messages', label: '💬 Messages', icon: <MessageSquare className='w-4 h-4' /> }] },
-  { label: 'LABELS', items: [{ id: '111-collective', label: '111 Collective', icon: <Disc3 className='w-4 h-4' /> }] }
+  { label: 'LABELS', items: [{ id: '111-collective', label: '111 Collective', icon: <Disc3 className='w-4 h-4' /> }] },
 ]
 
 const artistSections: NavSection[] = [
@@ -32,7 +31,7 @@ const labelSections: NavSection[] = [
   { label: 'MY MUSIC', items: [{ id: 'catalog-search', label: '🔍 Catalog Search', icon: <Search className='w-4 h-4' /> }, { id: 'upload', label: '↑ Upload', icon: <Upload className='w-4 h-4' /> }] },
   { label: 'GET WORK', items: [{ id: 'label-briefs', label: '📥 Brief Inbox', icon: <Inbox className='w-4 h-4' /> }, { id: 'ai-pitch', label: '✦ AI Pitch Tool', icon: <Sparkles className='w-4 h-4' /> }, { id: 'response-builder', label: '🎵 Response Builder', icon: <ListMusic className='w-4 h-4' /> }] },
   { label: 'TRACK IT', items: [{ id: 'pitch-tracker', label: '📤 Pitch Tracker', icon: <FolderKanban className='w-4 h-4' /> }, { id: 'earnings', label: '💰 Earnings', icon: <DollarSign className='w-4 h-4' /> }, { id: 'messages', label: '💬 Messages', icon: <MessageSquare className='w-4 h-4' /> }] },
-  { label: 'LABELS', items: [{ id: '111-collective', label: '111 Collective', icon: <Disc3 className='w-4 h-4' /> }] }
+  { label: 'LABELS', items: [{ id: '111-collective', label: '111 Collective', icon: <Disc3 className='w-4 h-4' /> }] },
 ]
 
 export function Sidebar({ profile, viewingRole, activeTab, onTabChange }: SidebarProps) {
@@ -47,8 +46,13 @@ export function Sidebar({ profile, viewingRole, activeTab, onTabChange }: Sideba
     load()
   }, [profile.id])
 
-  const sections = viewingRole === 'artist' ? artistSections : viewingRole === 'label' ? labelSections : supervisorSections
-  const finalSections = viewingRole === 'admin' ? [...supervisorSections, ...artistSections, ...labelSections, { label: 'ADMIN', items: [{ id: 'admin', label: '⚙ Admin Panel', icon: <Settings className='w-4 h-4' /> }] }] : sections
+  const sections =
+    viewingRole === 'artist' ? artistSections : viewingRole === 'label' ? labelSections : supervisorSections
+  const adminSections: NavSection[] = [
+    ...supervisorSections,
+    { label: 'ADMIN', items: [{ id: 'admin', label: '⚙ Admin Panel', icon: <Settings className='w-4 h-4' /> }] },
+  ]
+  const finalSections = viewingRole === 'admin' ? adminSections : sections
 
   return (
     <aside className="w-[220px] h-screen bg-[#0D0D12] border-r border-[#1A1A22] flex-col hidden md:flex">
@@ -68,15 +72,6 @@ export function Sidebar({ profile, viewingRole, activeTab, onTabChange }: Sideba
           </div>
         ))}
       </nav>
-      <div className="p-4 border-t border-[#1A1A22]">
-        <button
-          onClick={() => onTabChange('111-collective')}
-          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg text-[#C8A97E] hover:bg-[#1A1A1E] w-full"
-        >
-          <Disc3 className="w-4 h-4" />
-          <span>111 Collective</span>
-        </button>
-      </div>
     </aside>
   )
 }

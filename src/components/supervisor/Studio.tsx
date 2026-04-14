@@ -47,14 +47,6 @@ function useResizePx(key: string, defaultVal: number, min: number, max: number) 
 }
 
 export function Studio({ profile }: StudioProps) {
-  if (profile.role !== 'supervisor' && profile.role !== 'admin') {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-76px)]" style={{ background: '#070709' }}>
-        <p className="text-[#666] text-sm">Supervisor access only</p>
-      </div>
-    )
-  }
-
   const leftRef = useRef<HTMLDivElement>(null)
   const [videoHeightPct, setVideoHeightPct] = useState(() =>
     parseInt(localStorage.getItem('studio-video-h') || '55')
@@ -122,10 +114,10 @@ export function Studio({ profile }: StudioProps) {
 
   const handleSeek = useCallback((t: number) => {
     setCurrentTime(t)
-    if (project.syncVideo && videoRef.current && !isPlaying) {
+    if (project.syncVideo && videoRef.current) {
       videoRef.current.currentTime = t
     }
-  }, [project.syncVideo, isPlaying])
+  }, [project.syncVideo])
 
   const handleSkip = useCallback((delta: number) => {
     setCurrentTime(prev => Math.max(0, prev + delta))
@@ -143,7 +135,7 @@ export function Studio({ profile }: StudioProps) {
       trackId: track.id,
       title: track.title,
       artist: track.artist,
-      audioUrl: (track as any).audio_url || (track as any).preview_url || '',
+      audioUrl: track.audio_url || track.preview_url || '',
       color,
       muted: false,
       soloed: false,
@@ -161,6 +153,14 @@ export function Studio({ profile }: StudioProps) {
   }, [dawTracks])
 
   const timecode = formatTimecode(currentTime)
+
+  if (profile.role !== 'supervisor' && profile.role !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-76px)]" style={{ background: '#070709' }}>
+        <p className="text-[#666] text-sm">Supervisor access only</p>
+      </div>
+    )
+  }
 
   return (
     <div

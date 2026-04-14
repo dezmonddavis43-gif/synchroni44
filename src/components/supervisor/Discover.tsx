@@ -60,7 +60,7 @@ function getPrimaryMoodColor(moods: string[]): string {
   return MOOD_COLORS[moods[0]] || '#C8A97E'
 }
 
-export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQuery: externalSearchQuery, onTrackDetail: _onTrackDetail }: DiscoverProps) {
+export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQuery: externalSearchQuery }: DiscoverProps) {
   const [tracks, setTracks] = useState<Track[]>([])
   const [savedTracks, setSavedTracks] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -198,12 +198,11 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
       setFeaturedTracksLoading(true)
       const { data } = await supabase
         .from('tracks')
-        .select('id, title, artist, bpm, mood, genre, audio_url, artwork_color')
-        .eq('uploaded_by', 'f5a217f6-446f-4412-b912-aba71ae76fcb')
+        .select('*')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(4)
-      if (data) setFeaturedTracks(data)
+        .limit(8)
+      if (data) setFeaturedTracks(data as Track[])
       setFeaturedTracksLoading(false)
     }
     loadFeaturedTracks()

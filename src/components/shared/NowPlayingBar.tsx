@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Heart } from 'lucide-react'
 import { MobilePlayer } from './MobilePlayer'
 import { MOOD_COLORS } from '../../lib/constants'
 import type { Track } from '../../lib/types'
@@ -16,6 +16,8 @@ interface NowPlayingBarProps {
   onVolumeChange: (volume: number) => void
   onPrevious?: () => void
   onNext?: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
 }
 
 function formatTime(seconds: number): string {
@@ -35,7 +37,9 @@ export function NowPlayingBar({
   onSeek,
   onVolumeChange,
   onPrevious,
-  onNext
+  onNext,
+  isFavorite,
+  onToggleFavorite,
 }: NowPlayingBarProps) {
   const [showMobilePlayer, setShowMobilePlayer] = useState(false)
 
@@ -138,6 +142,22 @@ export function NowPlayingBar({
         </div>
 
         <div className="flex items-center gap-4 w-[280px] justify-end">
+          {onToggleFavorite && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                onToggleFavorite()
+              }}
+              disabled={!currentTrack}
+              className={`p-2 rounded-lg transition-colors disabled:opacity-40 ${
+                isFavorite ? 'text-[#FF6B9D]' : 'text-[#666] hover:text-[#FF6B9D]'
+              }`}
+              title={isFavorite ? 'Remove from saved' : 'Save track'}
+            >
+              <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <button
               onClick={() => onVolumeChange(volume > 0 ? 0 : 0.8)}

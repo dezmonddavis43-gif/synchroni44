@@ -35,6 +35,7 @@ export function VideoPanel({
   onVideoUrlChange,
   timecode,
 }: VideoPanelProps) {
+  void profile
   const [draggingOver, setDraggingOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [editingProject, setEditingProject] = useState(false)

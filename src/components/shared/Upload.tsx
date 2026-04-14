@@ -1,17 +1,17 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Select, PageTitle, Spinner } from './UI'
-import { MOODS, GENRES } from '../../lib/constants'
+import { MOODS, GENRES, MOOD_COLORS } from '../../lib/constants'
 import { Upload as UploadIcon, X, Music2, Check, AlertCircle, Sparkles, FileAudio, Layers, Mic2, Image, ChevronDown, Plus } from 'lucide-react'
 import type { Profile } from '../../lib/types'
 import { validateUploadFile } from '../../lib/businessRules'
 
 const TAG_CATEGORIES: Record<string, string[]> = {
-  'Scene Types': ['chase', 'romance', 'montage', 'opening credits', 'climax', 'flashback', 'training', 'celebration', 'funeral', 'road trip', 'heist', 'battle'],
-  'Emotions': ['triumphant', 'melancholic', 'tense', 'euphoric', 'nostalgic', 'mysterious', 'hopeful', 'heartbroken', 'determined', 'peaceful'],
-  'Settings': ['urban', 'nature', 'nightclub', 'office', 'beach', 'space', 'forest', 'stadium', 'home', 'street'],
-  'Production': ['cinematic', 'lo-fi', 'anthemic', 'minimalist', 'orchestral', 'trap', 'acoustic', 'electronic', 'soulful', 'experimental'],
-  'Usage': ['TV drama', 'TV comedy', 'film', 'advertising', 'trailer', 'gaming', 'documentary', 'social media']
+  SCENE: ['chase', 'romance', 'montage', 'opening credits', 'training', 'celebration', 'road trip', 'battle'],
+  EMOTIONS: ['triumphant', 'melancholic', 'tense', 'euphoric', 'nostalgic', 'hopeful', 'peaceful'],
+  SETTINGS: ['urban', 'nature', 'nightclub', 'beach', 'space', 'stadium', 'street'],
+  PRODUCTION: ['cinematic', 'lo-fi', 'anthemic', 'orchestral', 'trap', 'acoustic', 'electronic'],
+  USAGE: ['TV drama', 'TV comedy', 'film', 'advertising', 'trailer', 'gaming', 'social media'],
 }
 
 interface UploadProps {
@@ -200,12 +200,25 @@ export function Upload({ profile }: UploadProps) {
     if (!file) return
 
     const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-    if (!anthropicKey) {
-      alert('AI metadata suggestions are disabled. Set VITE_ANTHROPIC_API_KEY to enable this feature.')
-      return
-    }
 
     updateFile(fileId, { aiSuggesting: true })
+
+    if (!anthropicKey) {
+      const heuristic: AISuggestion = {
+        genre: file.genre && GENRES.includes(file.genre) ? file.genre : 'Electronic',
+        mood: file.mood && MOODS.includes(file.mood) ? file.mood : 'Hopeful',
+        bpm_range: '100-120',
+        key: 'A Minor',
+        tags: ['cinematic', 'montage', 'hopeful', 'advertising', 'triumphant', 'urban'],
+        clearance: 'PENDING — review stems and samples',
+        fee_suggested: 2500,
+        fee_range: '$1,500 - $4,000',
+        sync_potential: 'Medium',
+        sync_note: 'Offline heuristic (add VITE_ANTHROPIC_API_KEY for full AI analysis).',
+      }
+      updateFile(fileId, { aiSuggesting: false, aiSuggestion: heuristic })
+      return
+    }
 
     const systemPrompt = `You are a music metadata specialist for sync licensing. Given a track title and artist name, suggest the most likely and sync-relevant metadata. Think about what a music supervisor would search for.
 
@@ -309,20 +322,20 @@ Return ONLY valid JSON:
     updateFile(fileId, updates)
   }
 
-  const uploadAdditionalFile = async (additionalFile: AdditionalFile, baseFileName: string): Promise<string | null> => {
+  const uploadAdditionalFile = async (additionalFile: AdditionalFile, userId: string, basePrefix: string): Promise<string | null> => {
     try {
-      const fileExt = additionalFile.file.name.split('.').pop()
-      const fileName = `${baseFileName}_${additionalFile.type}_${crypto.randomUUID().slice(0, 8)}.${fileExt}`
+      const safe = additionalFile.file.name.replace(/[#\s]/g, '_')
+      const path = `${userId}/${basePrefix}_${additionalFile.type}_${Date.now()}_${safe}`
 
       const { error: uploadError } = await supabase.storage
         .from('audio-tracks')
-        .upload(fileName, additionalFile.file)
+        .upload(path, additionalFile.file, { upsert: true })
 
       if (uploadError) throw uploadError
 
       const { data: urlData } = supabase.storage
         .from('audio-tracks')
-        .getPublicUrl(fileName)
+        .getPublicUrl(path)
 
       return urlData.publicUrl
     } catch (error) {
@@ -350,16 +363,13 @@ Return ONLY valid JSON:
       try {
         updateFile(uploadFile.id, { status: 'uploading', progress: 0 })
 
-        const fileExt = uploadFile.file.name.split('.').pop()
-        const basePath = `${userId}/${uploadFile.id}`
-        const fileName = `${basePath}.${fileExt}`
-
-        console.log('Uploading to storage:', fileName)
-        console.log('Current authenticated user:', userId)
+        const safeName = uploadFile.file.name.replace(/[#\s]/g, '_')
+        const basePrefix = `${Date.now()}_${uploadFile.id}`
+        const audioPath = `${userId}/${basePrefix}_${safeName}`
 
         const { data: storageData, error: uploadError } = await supabase.storage
           .from('audio-tracks')
-          .upload(fileName, uploadFile.file)
+          .upload(audioPath, uploadFile.file, { upsert: true })
 
         if (uploadError) {
           console.error('Storage error:', uploadError)
@@ -373,17 +383,16 @@ Return ONLY valid JSON:
 
         let coverArtUrl: string | null = null
         if (uploadFile.coverArt) {
-          const imgExt = uploadFile.coverArt.name.split('.').pop()
-          const coverBasePath = `${userId}/${uploadFile.id}`
-          const coverFileName = `${coverBasePath}_cover.${imgExt}`
+          const coverSafe = uploadFile.coverArt.name.replace(/[#\s]/g, '_')
+          const coverPath = `${userId}/${basePrefix}_cover_${coverSafe}`
           const { error: coverUploadError } = await supabase.storage
             .from('audio-tracks')
-            .upload(coverFileName, uploadFile.coverArt)
+            .upload(coverPath, uploadFile.coverArt, { upsert: true })
 
           if (!coverUploadError) {
             const { data: coverUrlData } = supabase.storage
               .from('audio-tracks')
-              .getPublicUrl(coverFileName)
+              .getPublicUrl(coverPath)
             coverArtUrl = coverUrlData.publicUrl
           }
         }
@@ -395,19 +404,19 @@ Return ONLY valid JSON:
         const stemUrls: string[] = []
 
         if (uploadFile.instrumental) {
-          instrumentalUrl = await uploadAdditionalFile(uploadFile.instrumental, basePath)
+          instrumentalUrl = await uploadAdditionalFile(uploadFile.instrumental, userId, basePrefix)
         }
 
         updateFile(uploadFile.id, { progress: 70 })
 
         if (uploadFile.acapella) {
-          acapellaUrl = await uploadAdditionalFile(uploadFile.acapella, basePath)
+          acapellaUrl = await uploadAdditionalFile(uploadFile.acapella, userId, basePrefix)
         }
 
         updateFile(uploadFile.id, { progress: 80 })
 
         for (const stem of uploadFile.stems) {
-          const stemUrl = await uploadAdditionalFile(stem, basePath)
+          const stemUrl = await uploadAdditionalFile(stem, userId, basePrefix)
           if (stemUrl) stemUrls.push(stemUrl)
         }
 
@@ -415,7 +424,7 @@ Return ONLY valid JSON:
 
         const { data: urlData } = supabase.storage
           .from('audio-tracks')
-          .getPublicUrl(fileName)
+          .getPublicUrl(audioPath)
 
         console.log('Inserting track with uploaded_by:', userId)
 
@@ -434,7 +443,8 @@ Return ONLY valid JSON:
           stems_urls: stemUrls.length > 0 ? stemUrls : null,
           uploaded_by: userId,
           label_id: profile.role === 'label' ? userId : null,
-          status: 'review',
+          status: 'active',
+          artwork_color: (uploadFile.mood && MOOD_COLORS[uploadFile.mood]) || '#C8A97E',
           clearance_status: uploadFile.clearanceStatus || 'PENDING',
           micro_fee_min: uploadFile.microFeeMin ? parseInt(uploadFile.microFeeMin) : 29,
           micro_fee_max: uploadFile.microFeeMax ? parseInt(uploadFile.microFeeMax) : 149,
@@ -544,6 +554,16 @@ Return ONLY valid JSON:
 
             <div
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
+              onDrop={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                const dropped = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('audio/'))
+                if (dropped.length) {
+                  const synthetic = { target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>
+                  handleFileSelect(synthetic)
+                }
+              }}
               className="border-2 border-dashed border-[#2A2A2E] rounded-xl p-8 md:p-12 text-center cursor-pointer hover:border-[#C8A97E] transition-colors"
             >
               <UploadIcon className="w-12 h-12 text-[#555] mx-auto mb-4" />

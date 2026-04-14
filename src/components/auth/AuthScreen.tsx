@@ -3,13 +3,21 @@ import { Music2, Mail } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 interface AuthScreenProps {
-  onAuth: (user: any) => void
+  onAuth: (user: {
+    id: string
+    email?: string
+    full_name?: string
+    role?: string
+    created_at?: string
+    onboarding_complete?: boolean
+    plan?: string
+  }) => void
 }
 
 const ROLE_OPTIONS = [
   { value: 'supervisor', label: 'Music Supervisor' },
   { value: 'artist', label: 'Artist' },
-  { value: 'label', label: 'Label / Publisher' },
+  { value: 'label', label: 'Label/Publisher' },
   { value: 'admin', label: 'Admin' },
 ]
 
@@ -70,7 +78,14 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
         .maybeSingle()
 
       if (profile) {
-        onAuth({ ...data.user, full_name: profile.full_name, role: profile.role })
+        const p = profile as { full_name?: string; role?: string; onboarding_complete?: boolean; plan?: string }
+        onAuth({
+          ...data.user,
+          full_name: p.full_name,
+          role: p.role,
+          onboarding_complete: p.onboarding_complete,
+          plan: p.plan,
+        })
       } else {
         await supabase.from('profiles').upsert({
           id: data.user.id,
@@ -83,10 +98,12 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
           ...data.user,
           role: data.user.user_metadata?.role || 'supervisor',
           full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          onboarding_complete: false,
+          plan: 'free',
         })
       }
-    } catch (err: any) {
-      setError(friendlyError(err.message || 'Failed to sign in'))
+    } catch (err: unknown) {
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to sign in'))
     } finally {
       setLoading(false)
     }
@@ -115,47 +132,43 @@ export function AuthScreen({ onAuth }: AuthScreenProps) {
 
       if (!data.user) throw new Error('Sign up failed — no user returned')
 
-      if (data.session) {
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: fullName,
-          role,
-          onboarding_complete: false,
-          plan: 'free',
-        })
-        onAuth({ ...data.user, full_name: fullName, role })
-        return
-      }
-
-      if (data.user && !data.session) {
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: fullName,
-          role,
-          onboarding_complete: false,
-          plan: 'free',
-        })
-
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-        if (signInError) {
-          if (signInError.message.includes('Email not confirmed')) {
-            setConfirmPending(true)
-            setPendingEmail(email)
-            setLoading(false)
-            return
-          }
-          throw signInError
-        }
-        if (signInData.user) {
-          onAuth({ ...signInData.user, full_name: fullName, role })
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) {
+        if (signInError.message.includes('Email not confirmed')) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            full_name: fullName,
+            role,
+            onboarding_complete: false,
+            plan: 'free',
+          })
+          setConfirmPending(true)
+          setPendingEmail(email)
+          setLoading(false)
           return
         }
-
-        setConfirmPending(true)
-        setPendingEmail(email)
+        throw signInError
       }
-    } catch (err: any) {
-      setError(friendlyError(err.message || 'Failed to create account'))
+
+      if (!signInData.user) throw new Error('Sign in after sign up failed')
+
+      await supabase.from('profiles').upsert({
+        id: signInData.user.id,
+        full_name: fullName,
+        role,
+        onboarding_complete: false,
+        plan: 'free',
+      })
+
+      onAuth({
+        ...signInData.user,
+        full_name: fullName,
+        role,
+        onboarding_complete: false,
+        plan: 'free',
+      })
+    } catch (err: unknown) {
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to create account'))
     } finally {
       setLoading(false)
     }
