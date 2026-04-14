@@ -262,7 +262,7 @@ function App() {
           onViewingRoleChange={handleViewingRoleChange}
           onSignOut={handleSignOut}
         />
-        <main className="flex-1 overflow-hidden pb-[68px]">
+        <main className="flex-1 overflow-hidden bg-[#070709] pb-[68px] antialiased">
           {artistSlug ? (
             <ArtistProfilePage
               artistSlug={artistSlug}

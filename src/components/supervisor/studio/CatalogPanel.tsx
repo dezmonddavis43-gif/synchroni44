@@ -25,8 +25,8 @@ function TrackRow({ track, onAdd }: { track: Track; onAdd: () => void }) {
     <tr
       className="border-b border-[#0E0E14] hover:bg-[#131318] group transition-colors"
       draggable
-      onDragStart={() => { (window as any).__studioTrack = track }}
-      onDragEnd={() => { delete (window as any).__studioTrack }}
+      onDragStart={() => { window.__studioTrack = track }}
+      onDragEnd={() => { window.__studioTrack = undefined }}
       style={{ cursor: 'grab' }}
     >
       <td className="px-1 py-1 text-[#333] group-hover:text-[#555]">
@@ -60,7 +60,7 @@ function TrackRow({ track, onAdd }: { track: Track; onAdd: () => void }) {
           </span>
         ) : <span className="text-[#333] text-[9px]">–</span>}
       </td>
-      <td className="px-1.5 py-1 text-[9px] text-[#444]">{formatDuration(track.duration || (track as any).duration_seconds)}</td>
+      <td className="px-1.5 py-1 text-[9px] text-[#444]">{formatDuration(track.duration)}</td>
       <td className="px-1 py-1">
         <button
           onClick={onAdd}
@@ -100,8 +100,9 @@ export function CatalogPanel({ onAddTrack, selectedTrack }: CatalogPanelProps) {
       .order('play_count', { ascending: false })
 
     if (data) {
-      setTracks(data as Track[])
-      const uniqueGenres = [...new Set(data.map((t: any) => t.genre).filter(Boolean))] as string[]
+      const rows = data as Track[]
+      setTracks(rows)
+      const uniqueGenres = [...new Set(rows.map(t => t.genre).filter(Boolean))] as string[]
       setGenres(uniqueGenres)
     }
     setLoading(false)
@@ -118,10 +119,12 @@ export function CatalogPanel({ onAddTrack, selectedTrack }: CatalogPanelProps) {
 
   const filtered = tracks.filter(t => {
     const q = search.toLowerCase()
-    const matchSearch = !q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || ((t as any).tags || []).some((tag: string) => tag.toLowerCase().includes(q))
+    const tags = Array.isArray(t.tags) ? t.tags : []
+    const matchSearch = !q || t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q) || tags.some(tag => tag.toLowerCase().includes(q))
     const matchMood = mood === 'All' || t.mood === mood
     const matchGenre = !genre || t.genre === genre
-    const matchBpm = (!bpmMin || ((t as any).bpm || 0) >= Number(bpmMin)) && (!bpmMax || ((t as any).bpm || 0) <= Number(bpmMax))
+    const bpmVal = t.bpm ?? 0
+    const matchBpm = (!bpmMin || bpmVal >= Number(bpmMin)) && (!bpmMax || bpmVal <= Number(bpmMax))
     return matchSearch && matchMood && matchGenre && matchBpm
   })
 
@@ -328,11 +331,11 @@ export function CatalogPanel({ onAddTrack, selectedTrack }: CatalogPanelProps) {
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 {[
                   ['Genre', selectedTrack.genre],
-                  ['BPM', (selectedTrack as any).bpm],
-                  ['Key', (selectedTrack as any).key],
+                  ['BPM', selectedTrack.bpm != null ? String(selectedTrack.bpm) : ''],
+                  ['Key', selectedTrack.key ?? selectedTrack.musical_key ?? ''],
                   ['Mood', selectedTrack.mood],
-                  ['Duration', formatDuration(selectedTrack.duration || (selectedTrack as any).duration_seconds)],
-                  ['Clearance', (selectedTrack as any).clearance_status],
+                  ['Duration', formatDuration(selectedTrack.duration)],
+                  ['Clearance', selectedTrack.clearance_status ?? ''],
                 ].map(([label, value]) => value && (
                   <div key={label as string} className="bg-[#131318] rounded p-2">
                     <p className="text-[#555] text-[9px] uppercase tracking-wider mb-0.5">{label}</p>

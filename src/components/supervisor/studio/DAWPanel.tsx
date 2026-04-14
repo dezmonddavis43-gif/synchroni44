@@ -110,11 +110,13 @@ export function DAWPanel({
     } catch { return null }
   }, [getAudioCtx])
 
+  const tracksBufferKey = tracks.map(t => `${t.id}:${t.audioBuffer ? '1' : '0'}`).join(',')
+
   useEffect(() => {
     tracks.forEach(t => {
       if (!t.audioBuffer && t.audioUrl) {
         setLoadingTrackId(t.id)
-        loadAudioFromUrl(t.audioUrl).then(buf => {
+        void loadAudioFromUrl(t.audioUrl).then(buf => {
           setLoadingTrackId(null)
           if (buf) {
             onTracksChange(tracks.map(tr => tr.id === t.id ? { ...tr, audioBuffer: buf } : tr))
@@ -122,10 +124,16 @@ export function DAWPanel({
         })
       }
     })
-  }, [tracks.map(t => t.id + ':' + (t.audioBuffer ? '1' : '0')).join(',')])
+  }, [tracksBufferKey, tracks, loadAudioFromUrl, onTracksChange])
 
   const stopAll = useCallback(() => {
-    sourceRefs.current.forEach(src => { try { src.stop() } catch {} })
+    sourceRefs.current.forEach(src => {
+      try {
+        src.stop()
+      } catch {
+        void 0
+      }
+    })
     sourceRefs.current.clear()
     gainRefs.current.clear()
     cancelAnimationFrame(rafRef.current)
@@ -217,7 +225,11 @@ export function DAWPanel({
     if (!track?.audioBuffer) return
     const ctx = getAudioCtx()
     if (ctx.state === 'suspended') ctx.resume()
-    try { sourceRefs.current.get(trackId)?.stop() } catch {}
+    try {
+      sourceRefs.current.get(trackId)?.stop()
+    } catch {
+      void 0
+    }
 
     const gain = ctx.createGain()
     gain.gain.value = track.volume / 100
@@ -244,7 +256,11 @@ export function DAWPanel({
   }, [tracks, onTracksChange])
 
   const removeTrack = useCallback((id: string) => {
-    try { sourceRefs.current.get(id)?.stop() } catch {}
+    try {
+      sourceRefs.current.get(id)?.stop()
+    } catch {
+      void 0
+    }
     sourceRefs.current.delete(id)
     gainRefs.current.delete(id)
     onTracksChange(tracks.filter(t => t.id !== id))
@@ -262,7 +278,7 @@ export function DAWPanel({
 
   const handleDropZone = (e: React.DragEvent) => {
     e.preventDefault()
-    const raw = (window as any).__studioTrack
+    const raw = window.__studioTrack
     if (!raw || tracks.length >= 8 || tracks.some(t => t.trackId === raw.id)) return
     addNewDAWTrack({
       trackId: raw.id,

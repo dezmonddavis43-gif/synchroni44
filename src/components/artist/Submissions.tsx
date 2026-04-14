@@ -86,7 +86,7 @@ export function Submissions({ profile }: SubmissionsProps) {
                 <div className="flex-1 min-w-0">
                   <p className="text-[#E8E8E8] font-medium truncate">{submission.track?.title}</p>
                   <p className="text-sm text-[#666]">
-                    To: {(submission as any).supervisor?.full_name || 'Unknown'}
+                    To: {submission.supervisor?.full_name || 'Unknown'}
                   </p>
                 </div>
 

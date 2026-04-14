@@ -81,7 +81,7 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
     const queryLower = searchQuery.toLowerCase()
     const keywords = queryLower.split(/\s+/).filter(k => k.length > 2)
 
-    let results = tracks.filter(track => {
+    const matched = tracks.filter(track => {
       let score = 0
 
       keywords.forEach(keyword => {
@@ -119,8 +119,9 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
       return score > 0
     })
 
-    results.sort((a, b) => {
-      let scoreA = 0, scoreB = 0
+    const sorted = [...matched].sort((a, b) => {
+      let scoreA = 0
+      let scoreB = 0
       keywords.forEach(keyword => {
         if (a.mood?.toLowerCase().includes(keyword)) scoreA += 5
         if (a.genre?.toLowerCase().includes(keyword)) scoreA += 4
@@ -131,7 +132,7 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
     })
 
     await new Promise(resolve => setTimeout(resolve, 800))
-    setSearchResults(results)
+    setSearchResults(sorted)
     setIsSearching(false)
   }
 

@@ -27,7 +27,16 @@ export function ResponseBuilder({ profile }: ResponseBuilderProps) {
         supabase.from('brief_sends').select('*, brief:briefs(*)').eq('recipient_id', profile.id),
         supabase.from('tracks').select('*').eq('status', 'active').eq('label_id', profile.id)
       ])
-      setBriefs((briefRes.data && briefRes.data.length ? briefRes.data : demoBriefs.map((b, i) => ({ id: `demo-${i}`, brief_id: b.id!, sent_at: new Date().toISOString(), opened: false, submitted: false, brief: b as Brief })) ) as any)
+      const demoRows: (BriefSend & { brief?: Brief })[] = demoBriefs.map((b, i) => ({
+        id: `demo-send-${i}`,
+        brief_id: b.id!,
+        recipient_id: profile.id,
+        sent_at: new Date().toISOString(),
+        opened: false,
+        submitted: false,
+        brief: b as Brief,
+      }))
+      setBriefs(briefRes.data?.length ? (briefRes.data as (BriefSend & { brief?: Brief })[]) : demoRows)
       setSelectedBriefId((briefRes.data?.[0]?.brief_id || demoBriefs[0].id) as string)
       setCatalog((trackRes.data && trackRes.data.length ? trackRes.data : [{ id: 't1', title: 'Neon Pulse', artist: 'Nova', uploaded_by: profile.id, created_at: new Date().toISOString(), mood: 'Tense', bpm: 122 } as Track]))
     }

@@ -28,6 +28,7 @@ export function VideoPanel({
   sceneName,
   status,
   videoUrl,
+  syncVideo,
   videoRef,
   onProjectNameChange,
   onSceneNameChange,
@@ -36,6 +37,7 @@ export function VideoPanel({
   timecode,
 }: VideoPanelProps) {
   void profile
+  void syncVideo
   const [draggingOver, setDraggingOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [editingProject, setEditingProject] = useState(false)

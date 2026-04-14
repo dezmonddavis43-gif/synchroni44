@@ -45,7 +45,6 @@ export interface Track {
   clearance_status?: 'CLEAR' | 'PRO' | 'PENDING'
   status?: 'active' | 'review' | 'rejected' | 'draft'
   duration?: number
-  duration_seconds?: number
   lyrics?: string
   themes?: string[]
   tags?: string[]
@@ -244,6 +243,7 @@ export interface InboxSubmission {
   track?: Track
   artist?: Profile
   brief?: Brief
+  supervisor?: Profile
 }
 
 export interface LicenseRequest {
@@ -317,7 +317,8 @@ export interface LabelRosterMember {
 export interface Pitch {
   id: string
   track_id: string
-  label_id: string
+  label_id?: string
+  submitted_by?: string
   supervisor_name?: string
   project_name?: string
   fee_offered?: number
