@@ -71,8 +71,9 @@ interface AISuggestion {
   sync_note: string
 }
 
+const MOOD_OPTIONS = MOODS.filter(m => m !== 'All')
+
 export function Upload({ profile }: UploadProps) {
-  const [step, setStep] = useState(1)
   const [files, setFiles] = useState<UploadFile[]>([])
   const [sharedArtist, setSharedArtist] = useState('')
   const [sharedMood, setSharedMood] = useState('')
@@ -206,7 +207,7 @@ export function Upload({ profile }: UploadProps) {
     if (!anthropicKey) {
       const heuristic: AISuggestion = {
         genre: file.genre && GENRES.includes(file.genre) ? file.genre : 'Electronic',
-        mood: file.mood && MOODS.includes(file.mood) ? file.mood : 'Hopeful',
+        mood: file.mood && MOOD_OPTIONS.includes(file.mood) ? file.mood : 'Hopeful',
         bpm_range: '100-120',
         key: 'A Minor',
         tags: ['cinematic', 'montage', 'hopeful', 'advertising', 'triumphant', 'urban'],
@@ -254,7 +255,7 @@ ${file.genre ? `Current Genre: ${file.genre}` : ''}
 Return ONLY valid JSON:
 {
   "genre": "suggested genre",
-  "mood": "suggested mood from: Tense/Hopeful/Melancholic/Sensual/Aggressive/Peaceful/Suspenseful/Nostalgic",
+  "mood": "suggested mood — use one canonical value from the app list (e.g. Tense, Hopeful, Cinematic, Uplifting, Dark, Epic, ...)",
   "bpm_range": "estimated BPM range e.g. 90-110",
   "key": "estimated key if determinable",
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10"],
@@ -291,7 +292,7 @@ Return ONLY valid JSON:
 
     if (field === 'genre' && GENRES.includes(suggestion.genre)) {
       updates.genre = suggestion.genre
-    } else if (field === 'mood' && MOODS.includes(suggestion.mood)) {
+    } else if (field === 'mood' && MOOD_OPTIONS.includes(suggestion.mood)) {
       updates.mood = suggestion.mood
     } else if (field === 'bpm_range') {
       const match = suggestion.bpm_range.match(/\d+/)
@@ -313,7 +314,7 @@ Return ONLY valid JSON:
     const updates: Partial<UploadFile> = {}
 
     if (GENRES.includes(suggestion.genre)) updates.genre = suggestion.genre
-    if (MOODS.includes(suggestion.mood)) updates.mood = suggestion.mood
+    if (MOOD_OPTIONS.includes(suggestion.mood)) updates.mood = suggestion.mood
     const bpmMatch = suggestion.bpm_range.match(/\d+/)
     if (bpmMatch) updates.bpm = bpmMatch[0]
     updates.key = suggestion.key
@@ -496,62 +497,18 @@ Return ONLY valid JSON:
 
   return (
     <div className="p-4 md:p-6 h-[calc(100vh-76px)] md:h-[calc(100vh-76px)] overflow-y-auto pb-40 md:pb-6">
-      <PageTitle title="Upload Tracks" sub="Add new tracks to your catalog" />
+      <PageTitle title="Upload Tracks" sub="Upload one or many tracks at once—add files, edit all metadata on this page, confirm rights, then submit." />
 
-      <div className="flex gap-2 mb-6 overflow-x-auto">
-        {[1, 2, 3].map(s => (
-          <button
-            key={s}
-            onClick={() => setStep(s)}
-            disabled={s > 1 && files.length === 0}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              step === s
-                ? 'bg-[#C8A97E] text-[#0A0A0C]'
-                : 'bg-[#1A1A1E] text-[#888] hover:text-[#E8E8E8]'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            {s === 1 ? 'Select Files' : s === 2 ? 'Track Details' : 'Upload'}
-          </button>
-        ))}
-      </div>
-
+      <div className="space-y-6">
       <input ref={coverArtInputRef} type="file" accept="image/*" onChange={handleCoverArtSelect} className="hidden" />
       <input ref={instrumentalInputRef} type="file" accept="audio/*" onChange={handleInstrumentalSelect} className="hidden" />
       <input ref={acapellaInputRef} type="file" accept="audio/*" onChange={handleAcapellaSelect} className="hidden" />
       <input ref={stemInputRef} type="file" accept="audio/*" multiple onChange={handleStemSelect} className="hidden" />
 
-      {step === 1 && (
-        <div className="space-y-6">
           <Card className="p-4 md:p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Input
-                label="Default Artist Name"
-                value={sharedArtist}
-                onChange={e => setSharedArtist(e.target.value)}
-                placeholder={profile.full_name}
-              />
-              <Select
-                label="Default Mood"
-                value={sharedMood}
-                onChange={e => setSharedMood(e.target.value)}
-              >
-                <option value="">Select mood</option>
-                {MOODS.filter(m => m !== 'All').map(mood => (
-                  <option key={mood} value={mood}>{mood}</option>
-                ))}
-              </Select>
-              <Select
-                label="Default Genre"
-                value={sharedGenre}
-                onChange={e => setSharedGenre(e.target.value)}
-              >
-                <option value="">Select genre</option>
-                {GENRES.filter(g => g !== 'All').map(genre => (
-                  <option key={genre} value={genre}>{genre}</option>
-                ))}
-              </Select>
-            </div>
-
+            <p className="text-sm text-[#888] mb-4">
+              Select multiple audio files in one go (file picker or drag-and-drop). Defaults apply to new files; use Apply defaults to all to overwrite mood, genre, and artist on every row below.
+            </p>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={e => { e.preventDefault(); e.stopPropagation() }}
@@ -568,10 +525,10 @@ Return ONLY valid JSON:
             >
               <UploadIcon className="w-12 h-12 text-[#555] mx-auto mb-4" />
               <p className="text-[#E8E8E8] font-medium mb-2">
-                Click or drag to upload audio files
+                Click or drag to upload one or more audio files
               </p>
               <p className="text-sm text-[#666]">
-                Supports MP3, WAV, AIFF, FLAC
+                MP3, WAV, AIFF, FLAC — multi-select supported
               </p>
               <input
                 ref={fileInputRef}
@@ -583,12 +540,41 @@ Return ONLY valid JSON:
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[#1E1E22]">
+              <Input
+                label="Default Artist Name"
+                value={sharedArtist}
+                onChange={e => setSharedArtist(e.target.value)}
+                placeholder={profile.full_name}
+              />
+              <Select
+                label="Default Mood"
+                value={sharedMood}
+                onChange={e => setSharedMood(e.target.value)}
+              >
+                <option value="">Select mood</option>
+                {MOOD_OPTIONS.map(mood => (
+                  <option key={mood} value={mood}>{mood}</option>
+                ))}
+              </Select>
+              <Select
+                label="Default Genre"
+                value={sharedGenre}
+                onChange={e => setSharedGenre(e.target.value)}
+              >
+                <option value="">Select genre</option>
+                {GENRES.filter(g => g !== 'All').map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </Select>
+            </div>
+
             {files.length > 0 && (
               <div className="mt-6 space-y-2">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-[#888]">{files.length} files selected</p>
+                  <p className="text-sm text-[#888]">{files.length} file{files.length !== 1 ? 's' : ''} queued — edit each card below</p>
                   <Btn size="sm" variant="ghost" onClick={applySharedMetadata}>
-                    Apply Defaults
+                    Apply defaults to all
                   </Btn>
                 </div>
                 {files.map(file => (
@@ -598,7 +584,7 @@ Return ONLY valid JSON:
                     <span className="text-xs text-[#555] hidden md:block">
                       {(file.file.size / 1024 / 1024).toFixed(1)} MB
                     </span>
-                    <button onClick={() => removeFile(file.id)} className="text-[#666] hover:text-red-400 flex-shrink-0">
+                    <button type="button" onClick={() => removeFile(file.id)} className="text-[#666] hover:text-red-400 flex-shrink-0">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -607,16 +593,6 @@ Return ONLY valid JSON:
             )}
           </Card>
 
-          {files.length > 0 && (
-            <Btn onClick={() => setStep(2)}>
-              Continue to Details
-            </Btn>
-          )}
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="space-y-4">
           {files.map((file, index) => (
             <Card key={file.id} className="p-4">
               <div className="flex items-center gap-2 mb-4">
@@ -678,7 +654,7 @@ Return ONLY valid JSON:
                     onChange={e => updateFile(file.id, { mood: e.target.value })}
                   >
                     <option value="">Select mood</option>
-                    {MOODS.filter(m => m !== 'All').map(mood => (
+                    {MOOD_OPTIONS.map(mood => (
                       <option key={mood} value={mood}>{mood}</option>
                     ))}
                   </Select>
@@ -1012,14 +988,7 @@ Return ONLY valid JSON:
             </Card>
           ))}
 
-          <div className="flex gap-2">
-            <Btn variant="ghost" onClick={() => setStep(1)}>Back</Btn>
-            <Btn onClick={() => setStep(3)}>Continue to Upload</Btn>
-          </div>
-        </div>
-      )}
-
-      {step === 3 && (
+      {files.length > 0 && (
         <div className="space-y-6">
           <Card className="p-4 md:p-6">
             <h3 className="text-lg font-medium text-[#E8E8E8] mb-4">Rights Confirmation</h3>
@@ -1087,8 +1056,7 @@ Return ONLY valid JSON:
             </div>
           </Card>
 
-          <div className="flex gap-2">
-            <Btn variant="ghost" onClick={() => setStep(2)} disabled={uploading}>Back</Btn>
+          <div className="flex gap-2 justify-end">
             <Btn onClick={uploadFiles} disabled={!rightsConfirmed || uploading}>
               {uploading ? (
                 <>
@@ -1103,6 +1071,7 @@ Return ONLY valid JSON:
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
