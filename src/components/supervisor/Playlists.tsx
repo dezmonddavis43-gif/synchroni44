@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS } from '../../lib/constants'
@@ -50,10 +50,6 @@ export function Playlists({ profile, onPlayTrack, currentTrack, playing }: Playl
   const folderInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  useEffect(() => {
     if (editingName && nameInputRef.current) {
       nameInputRef.current.focus()
       nameInputRef.current.select()
@@ -72,7 +68,20 @@ export function Playlists({ profile, onPlayTrack, currentTrack, playing }: Playl
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  const loadData = async () => {
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true)
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (!error && data) setCatalogTracks(data)
+    setCatalogLoading(false)
+  }, [])
+
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [ownPlaylistsRes, publicPlaylistsRes, projectsRes] = await Promise.all([
       supabase.from('playlists').select('*').eq('owner_id', profile.id).order('created_at', { ascending: false }),
@@ -96,21 +105,12 @@ export function Playlists({ profile, onPlayTrack, currentTrack, playing }: Playl
     }
     if (projectsRes.data) setProjects(projectsRes.data)
     setLoading(false)
-    loadCatalog()
-  }
+    void loadCatalog()
+  }, [profile.id, loadCatalog])
 
-  const loadCatalog = async () => {
-    setCatalogLoading(true)
-    const { data, error } = await supabase
-      .from('tracks')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (!error && data) setCatalogTracks(data)
-    setCatalogLoading(false)
-  }
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const loadPlaylistTracks = async (playlistId: string) => {
     const { data, error } = await supabase

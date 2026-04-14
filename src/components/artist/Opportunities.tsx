@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, PageTitle, Spinner, MoodPill } from '../shared/UI'
 import { Briefcase, Send, Clock, CheckCircle, XCircle, Calendar, DollarSign, Music2, ChevronRight, Filter, ArrowRight } from 'lucide-react'
@@ -42,11 +42,7 @@ export function Opportunities({ profile }: OpportunitiesProps) {
   const [selectedTrack, setSelectedTrack] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
 
     const [briefsResult, submissionsResult, tracksResult] = await Promise.all([
@@ -78,7 +74,11 @@ export function Opportunities({ profile }: OpportunitiesProps) {
     setSubmissions(submissionsResult.data || [])
     setTracks(tracksResult.data || [])
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const filteredBriefs = briefs.filter(brief => {
     if (!brief.deadline) return briefFilter === 'all'

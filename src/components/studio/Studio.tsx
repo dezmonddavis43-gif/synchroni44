@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Spinner } from '../shared/UI'
 import { Plus, Film, Clock, Globe, CreditCard as Edit2, Trash2, Play, Pause, Music2, Upload, Link2, X, ArrowLeft, Save, Search, Image } from 'lucide-react'
@@ -102,14 +102,11 @@ export function Studio({ profile }: StudioProps) {
   const [selectedEntry, setSelectedEntry] = useState<StudioEntry | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadEntries()
-  }, [profile.id])
-
-  const fetchEntries = () =>
-    supabase
-      .from('studio_entries')
-      .select(`
+  const fetchEntries = useCallback(
+    () =>
+      supabase
+        .from('studio_entries')
+        .select(`
         *,
         creator:profiles!studio_entries_created_by_fkey(id, full_name, avatar_url),
         attached_tracks:studio_entry_tracks(
@@ -120,10 +117,12 @@ export function Studio({ profile }: StudioProps) {
           track:tracks(id, title, artist, cover_art_url, audio_url, preview_url, instrumental_url, acapella_url)
         )
       `)
-      .eq('created_by', profile.id)
-      .order('created_at', { ascending: false })
+        .eq('created_by', profile.id)
+        .order('created_at', { ascending: false }),
+    [profile.id]
+  )
 
-  const seedDemoEntries = async () => {
+  const seedDemoEntries = useCallback(async () => {
     const payload = STUDIO_DEMO_ENTRIES.map((demo) => ({
       ...demo,
       created_by: profile.id
@@ -166,9 +165,9 @@ export function Studio({ profile }: StudioProps) {
     if (validAttachRows.length > 0) {
       await supabase.from('studio_entry_tracks').insert(validAttachRows)
     }
-  }
+  }, [profile.id])
 
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     setLoading(true)
     const { data, error } = await fetchEntries()
 
@@ -182,7 +181,11 @@ export function Studio({ profile }: StudioProps) {
       }
     }
     setLoading(false)
-  }
+  }, [fetchEntries, seedDemoEntries])
+
+  useEffect(() => {
+    void loadEntries()
+  }, [loadEntries])
 
   const handleCreate = () => {
     setSelectedEntry(null)
@@ -431,11 +434,7 @@ function StudioEditor({ entry, onSave, onCancel }: StudioEditorProps) {
     }
   }, [entry])
 
-  useEffect(() => {
-    loadCatalogTracks()
-  }, [])
-
-  const loadCatalogTracks = async () => {
+  const loadCatalogTracks = useCallback(async () => {
     setLoadingCatalog(true)
     const { data } = await supabase
       .from('tracks')
@@ -448,16 +447,13 @@ function StudioEditor({ entry, onSave, onCancel }: StudioEditorProps) {
       setCatalogTracks(data as Track[])
     }
     setLoadingCatalog(false)
-  }
+  }, [])
 
   useEffect(() => {
-    const debounce = setTimeout(() => {
-      if (trackSearchQuery) searchTracks(trackSearchQuery)
-    }, 300)
-    return () => clearTimeout(debounce)
-  }, [trackSearchQuery])
+    void loadCatalogTracks()
+  }, [loadCatalogTracks])
 
-  const searchTracks = async (query: string) => {
+  const searchTracks = useCallback(async (query: string) => {
     if (!query.trim()) {
       setTrackSearchResults([])
       return
@@ -475,7 +471,14 @@ function StudioEditor({ entry, onSave, onCancel }: StudioEditorProps) {
       setTrackSearchResults(data.filter(t => !attachedIds.has(t.id)) as Track[])
     }
     setSearchingTracks(false)
-  }
+  }, [attachedTracks])
+
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      if (trackSearchQuery) void searchTracks(trackSearchQuery)
+    }, 300)
+    return () => clearTimeout(debounce)
+  }, [trackSearchQuery, searchTracks])
 
   const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

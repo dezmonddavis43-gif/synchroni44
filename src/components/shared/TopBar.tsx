@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, Bell, ChevronDown, LogOut } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { RoleBadge } from './UI'
@@ -29,24 +29,24 @@ export function TopBar({ profile, searchQuery, onSearchChange, viewingRole, onVi
   const roleMenuRef = useRef<HTMLDivElement>(null)
   const roleColor = ROLE_COLORS[viewingRole] || '#C8A97E'
 
-  useEffect(() => {
-    loadNotifications()
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
-      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) setShowRoleMenu(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [profile.id])
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     const { count } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('recipient_id', profile.id)
       .eq('read', false)
     setNotifications(count || 0)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadNotifications()
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) setShowRoleMenu(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [loadNotifications])
 
   const initials = profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 

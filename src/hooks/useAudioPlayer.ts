@@ -48,6 +48,7 @@ export function useAudioPlayer() {
     setState(prev => ({ ...prev, isFavorite: !!data }))
   }, [])
 
+  /* eslint-disable react-hooks/exhaustive-deps -- favorite follows track id; avoid unstable Track object in deps */
   useEffect(() => {
     const t = state.currentTrack
     const uid = lastUserIdRef.current
@@ -57,10 +58,10 @@ export function useAudioPlayer() {
     }
     void refreshFavorite(t.id, uid)
   }, [state.currentTrack?.id, refreshFavorite])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   useEffect(() => {
     audioRef.current = new Audio()
-    audioRef.current.volume = state.volume
 
     const audio = audioRef.current
 
@@ -97,6 +98,10 @@ export function useAudioPlayer() {
       audio.pause()
     }
   }, [])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = state.volume
+  }, [state.volume])
 
   const recordPlayEvent = useCallback(async (track: Track, userId?: string) => {
     try {

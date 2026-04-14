@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner, EmptyState, Btn, Input } from '../shared/UI'
 import { ArtistLink } from '../shared/ArtistLink'
@@ -67,11 +67,7 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
 
   const featuredScrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
 
     const [tracksRes, rosterRes, savedRes] = await Promise.all([
@@ -85,7 +81,11 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
     if (savedRes.data) setSavedTracks(new Set(savedRes.data.map(s => s.track_id)))
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const toggleSave = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation()

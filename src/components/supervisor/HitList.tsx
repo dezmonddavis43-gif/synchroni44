@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Textarea, Select, PageTitle, Spinner, EmptyState } from '../shared/UI'
 import { MOODS, GENRES } from '../../lib/constants'
@@ -31,11 +31,7 @@ export function HitList({ profile }: HitListProps) {
     is_private: true
   })
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [membersRes, artistsRes] = await Promise.all([
       supabase
@@ -51,7 +47,11 @@ export function HitList({ profile }: HitListProps) {
     if (membersRes.data) setMembers(membersRes.data)
     if (artistsRes.data) setArtists(artistsRes.data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const searchArtists = (query: string) => {
     setSearchQuery(query)

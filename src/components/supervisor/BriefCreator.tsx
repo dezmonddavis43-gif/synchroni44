@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Spinner } from '../shared/UI'
 import { MOODS, GENRES } from '../../lib/constants'
@@ -66,11 +66,7 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
   const [contactSearch, setContactSearch] = useState('')
   const [csvData, setCsvData] = useState<{ name: string; company: string; email: string; type: string }[]>([])
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
 
     const [contactsRes, hitlistRes] = await Promise.all([
@@ -116,7 +112,11 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
     }
 
     setLoading(false)
-  }
+  }, [profile.id, editBriefId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const toggleMood = (mood: string) => {
     setSelectedMoods(prev =>

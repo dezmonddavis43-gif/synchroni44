@@ -73,10 +73,6 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
   const catalogTracksRef = useRef<Track[]>([])
 
   useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  useEffect(() => {
     const handleClickOutside = () => setContextMenu(null)
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
@@ -86,7 +82,20 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     localStorage.setItem('playlistWorkspaceSplit', splitRatio.toString())
   }, [splitRatio])
 
-  const loadData = async () => {
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true)
+
+    let query = supabase.from('tracks').select('*').order('created_at', { ascending: false }).limit(200)
+
+    query = query.eq('status', 'active')
+
+    const { data } = await query
+
+    if (data) setCatalogTracks(data)
+    setCatalogLoading(false)
+  }, [])
+
+  const loadData = useCallback(async () => {
     setLoading(true)
     const { data: authData } = await supabase.auth.getUser()
     const userId = authData.user?.id ?? profile.id
@@ -124,21 +133,12 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     }
 
     setLoading(false)
-    loadCatalog()
-  }
+    void loadCatalog()
+  }, [profile.id, loadCatalog])
 
-  const loadCatalog = async () => {
-    setCatalogLoading(true)
-
-    let query = supabase.from('tracks').select('*').order('created_at', { ascending: false }).limit(200)
-
-    query = query.eq('status', 'active')
-
-    const { data } = await query
-
-    if (data) setCatalogTracks(data)
-    setCatalogLoading(false)
-  }
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const filteredCatalog = catalogTracks.filter(track => {
     const matchesSearch = !searchQuery ||

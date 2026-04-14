@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Btn, Input, Select, Textarea, Spinner, EmptyState } from '../shared/UI'
 import { MOODS, GENRES, MOOD_COLORS } from '../../lib/constants'
@@ -52,17 +52,13 @@ export function AIPlaylistCreator({ profile, onPlayTrack, currentTrack, playing,
   const [draggedTrack, setDraggedTrack] = useState<Track | null>(null)
 
   useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  useEffect(() => {
     if (initialBrief) {
       setBriefText(initialBrief.description || '')
       setSelectedBriefId(initialBrief.id)
     }
   }, [initialBrief])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const ownCatalogQuery = profile.role === 'label'
       ? supabase.from('tracks').select('*').eq('label_id', profile.id).eq('status', 'active')
@@ -89,7 +85,11 @@ export function AIPlaylistCreator({ profile, onPlayTrack, currentTrack, playing,
     if (briefsRes.data?.length) setBriefs(briefsRes.data)
     if (supervisorsRes.data) setSupervisors(supervisorsRes.data)
     setLoading(false)
-  }
+  }, [profile.id, profile.role])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const selectBrief = (briefId: string) => {
     setSelectedBriefId(briefId)

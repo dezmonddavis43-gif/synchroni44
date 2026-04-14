@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Spinner, MoodPill } from '../shared/UI'
 import { MOOD_COLORS } from '../../lib/constants'
@@ -57,80 +57,18 @@ export function BriefResponse({
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, { track: Track; score: number; reason: string }[]>>({})
 
   const brief = briefSend.brief
-  const buckets = brief.buckets || []
+  const buckets = useMemo(() => brief.buckets || [], [brief.buckets])
 
-  useEffect(() => {
-    loadData()
-    markAsOpened()
-  }, [profile.id, briefSend.id])
-
-  const markAsOpened = async () => {
+  const markAsOpened = useCallback(async () => {
     if (!briefSend.opened) {
       await supabase
         .from('brief_sends')
         .update({ opened: true, opened_at: new Date().toISOString() })
         .eq('id', briefSend.id)
     }
-  }
+  }, [briefSend.opened, briefSend.id])
 
-  const loadData = async () => {
-    setLoading(true)
-
-    const { data: tracks } = await supabase
-      .from('tracks')
-      .select('*')
-      .eq('uploaded_by', profile.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-
-    if (tracks) {
-      setCatalogTracks(tracks)
-      generateAiSuggestions(tracks)
-    }
-
-    const { data: existingResponse } = await supabase
-      .from('brief_responses')
-      .select('*, tracks:brief_response_tracks(*, track:tracks(*))')
-      .eq('brief_id', brief.id)
-      .eq('responder_id', profile.id)
-      .maybeSingle()
-
-    if (existingResponse) {
-      setMessage(existingResponse.message || '')
-      const loadedBucketTracks: Record<string, BucketTrack[]> = {}
-
-      buckets.forEach(bucket => {
-        loadedBucketTracks[bucket.id] = []
-      })
-      loadedBucketTracks['uncategorized'] = []
-
-      existingResponse.tracks?.forEach((rt: { id: string; bucket_id?: string; track?: Track; quote_amount?: number; notes?: string }) => {
-        if (rt.track) {
-          const bucketId = rt.bucket_id || 'uncategorized'
-          if (!loadedBucketTracks[bucketId]) loadedBucketTracks[bucketId] = []
-          loadedBucketTracks[bucketId].push({
-            id: rt.id,
-            track: rt.track,
-            quote: rt.quote_amount || '',
-            notes: rt.notes || ''
-          })
-        }
-      })
-
-      setBucketTracks(loadedBucketTracks)
-    } else {
-      const initialBucketTracks: Record<string, BucketTrack[]> = {}
-      buckets.forEach(bucket => {
-        initialBucketTracks[bucket.id] = []
-      })
-      initialBucketTracks['uncategorized'] = []
-      setBucketTracks(initialBucketTracks)
-    }
-
-    setLoading(false)
-  }
-
-  const generateAiSuggestions = async (tracks: Track[]) => {
+  const generateAiSuggestions = useCallback(async (tracks: Track[]) => {
     const suggestions: Record<string, { track: Track; score: number; reason: string }[]> = {}
 
     buckets.forEach(bucket => {
@@ -179,7 +117,69 @@ export function BriefResponse({
     })
 
     setAiSuggestions(suggestions)
-  }
+  }, [brief, buckets])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+
+    const { data: tracks } = await supabase
+      .from('tracks')
+      .select('*')
+      .eq('uploaded_by', profile.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    if (tracks) {
+      setCatalogTracks(tracks)
+      void generateAiSuggestions(tracks)
+    }
+
+    const { data: existingResponse } = await supabase
+      .from('brief_responses')
+      .select('*, tracks:brief_response_tracks(*, track:tracks(*))')
+      .eq('brief_id', brief.id)
+      .eq('responder_id', profile.id)
+      .maybeSingle()
+
+    if (existingResponse) {
+      setMessage(existingResponse.message || '')
+      const loadedBucketTracks: Record<string, BucketTrack[]> = {}
+
+      buckets.forEach(bucket => {
+        loadedBucketTracks[bucket.id] = []
+      })
+      loadedBucketTracks['uncategorized'] = []
+
+      existingResponse.tracks?.forEach((rt: { id: string; bucket_id?: string; track?: Track; quote_amount?: number; notes?: string }) => {
+        if (rt.track) {
+          const bucketId = rt.bucket_id || 'uncategorized'
+          if (!loadedBucketTracks[bucketId]) loadedBucketTracks[bucketId] = []
+          loadedBucketTracks[bucketId].push({
+            id: rt.id,
+            track: rt.track,
+            quote: rt.quote_amount || '',
+            notes: rt.notes || ''
+          })
+        }
+      })
+
+      setBucketTracks(loadedBucketTracks)
+    } else {
+      const initialBucketTracks: Record<string, BucketTrack[]> = {}
+      buckets.forEach(bucket => {
+        initialBucketTracks[bucket.id] = []
+      })
+      initialBucketTracks['uncategorized'] = []
+      setBucketTracks(initialBucketTracks)
+    }
+
+    setLoading(false)
+  }, [profile.id, brief.id, buckets, generateAiSuggestions])
+
+  useEffect(() => {
+    void loadData()
+    void markAsOpened()
+  }, [loadData, markAsOpened])
 
   const addTrackToBucket = (bucketId: string, track: Track) => {
     const existsInBucket = bucketTracks[bucketId]?.some(bt => bt.track.id === track.id)

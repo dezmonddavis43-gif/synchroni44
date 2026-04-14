@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, PageTitle, Spinner, EmptyState, Tabs, MoodPill } from '../shared/UI'
 import { FileText, Sparkles, Send, Calendar, DollarSign } from 'lucide-react'
@@ -15,11 +15,7 @@ export function ArtistBriefs({ profile, onUseBrief }: ArtistBriefsProps) {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('For You')
 
-  useEffect(() => {
-    loadBriefs()
-  }, [profile.id])
-
-  const loadBriefs = async () => {
+  const loadBriefs = useCallback(async () => {
     setLoading(true)
 
     const [privateRes, publicRes] = await Promise.all([
@@ -48,7 +44,11 @@ export function ArtistBriefs({ profile, onUseBrief }: ArtistBriefsProps) {
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadBriefs()
+  }, [loadBriefs])
 
   const getDaysUntilDeadline = (deadline?: string) => {
     if (!deadline) return null

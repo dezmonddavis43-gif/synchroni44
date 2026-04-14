@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Calendar, DollarSign, MoreHorizontal, X, Clock } from 'lucide-react'
 import { StatCard, Card, Btn, Input, Spinner } from '../shared/UI'
@@ -38,11 +38,7 @@ export function Projects({ profile }: ProjectsProps) {
     deadline: ''
   })
 
-  useEffect(() => {
-    loadProjects()
-  }, [profile.id])
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     const { data: authData } = await supabase.auth.getUser()
     const userId = authData.user?.id ?? profile.id
 
@@ -82,7 +78,11 @@ export function Projects({ profile }: ProjectsProps) {
       setProjects([])
     }
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadProjects()
+  }, [loadProjects])
 
   const createProject = async () => {
     if (!newProject.name.trim()) return

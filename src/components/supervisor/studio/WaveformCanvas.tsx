@@ -16,11 +16,12 @@ export function WaveformCanvas({
   playheadPos,
   trimStart,
   trimEnd,
-  duration,
+  duration: _durationHint,
   zoom,
   color,
   onSeek,
 }: WaveformCanvasProps) {
+  void _durationHint
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -108,7 +109,7 @@ export function WaveformCanvas({
     ctx.lineTo(phX + 4, 0)
     ctx.lineTo(phX, 6)
     ctx.fill()
-  }, [buffer, playheadPos, trimStart, trimEnd, duration, zoom, color])
+  }, [buffer, playheadPos, trimStart, trimEnd, zoom, color])
 
   useEffect(() => {
     draw()

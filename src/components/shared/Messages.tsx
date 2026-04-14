@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Btn, Spinner, EmptyState } from './UI'
 import { Search, Send, MessageSquare } from 'lucide-react'
@@ -23,23 +23,6 @@ export function Messages({ profile }: MessagesProps) {
   const pollIntervalRef = useRef<number | null>(null)
 
   useEffect(() => {
-    loadData()
-
-    pollIntervalRef.current = window.setInterval(() => {
-      if (selectedUser) {
-        loadMessages(selectedUser.id)
-      }
-      loadConversations()
-    }, 10000)
-
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-      }
-    }
-  }, [profile.id])
-
-  useEffect(() => {
     scrollToBottom()
   }, [messages])
 
@@ -47,22 +30,16 @@ export function Messages({ profile }: MessagesProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const loadData = async () => {
-    setLoading(true)
-    await Promise.all([loadConversations(), loadUsers()])
-    setLoading(false)
-  }
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
       .select('*')
       .neq('id', profile.id)
 
     if (data) setUsers(data)
-  }
+  }, [profile.id])
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     const { data: sentMessages } = await supabase
       .from('messages')
       .select('*, recipient:profiles!messages_recipient_id_fkey(*)')
@@ -110,9 +87,9 @@ export function Messages({ profile }: MessagesProps) {
     )
 
     setConversations(sorted)
-  }
+  }, [profile.id])
 
-  const loadMessages = async (userId: string) => {
+  const loadMessages = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('messages')
       .select('*')
@@ -127,7 +104,30 @@ export function Messages({ profile }: MessagesProps) {
         await supabase.from('messages').update({ read: true }).in('id', unreadIds)
       }
     }
-  }
+  }, [profile.id])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([loadConversations(), loadUsers()])
+    setLoading(false)
+  }, [loadConversations, loadUsers])
+
+  useEffect(() => {
+    void loadData()
+
+    pollIntervalRef.current = window.setInterval(() => {
+      if (selectedUser) {
+        void loadMessages(selectedUser.id)
+      }
+      void loadConversations()
+    }, 10000)
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [profile.id, selectedUser, loadData, loadMessages, loadConversations])
 
   const selectConversation = (conv: Conversation) => {
     setSelectedUser(conv.user)

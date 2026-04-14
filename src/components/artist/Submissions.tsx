@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, PageTitle, StatCard, StatusBadge, Spinner, EmptyState, Tabs } from '../shared/UI'
 import { Send, Music2 } from 'lucide-react'
@@ -13,11 +13,7 @@ export function Submissions({ profile }: SubmissionsProps) {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
 
-  useEffect(() => {
-    loadSubmissions()
-  }, [profile.id])
-
-  const loadSubmissions = async () => {
+  const loadSubmissions = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('inbox_submissions')
@@ -27,7 +23,11 @@ export function Submissions({ profile }: SubmissionsProps) {
 
     if (data) setSubmissions(data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadSubmissions()
+  }, [loadSubmissions])
 
   const filteredSubmissions = submissions.filter(s =>
     activeTab === 'All' || s.status === activeTab.toLowerCase()

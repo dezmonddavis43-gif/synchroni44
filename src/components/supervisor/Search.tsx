@@ -230,7 +230,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
           </h2>
           {filteredTracks.length > 0 ? (
             <div className="bg-[#0D0D10] rounded-xl border border-[#1A1A1E] overflow-hidden">
-              <div className="grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-4 px-4 py-3 text-xs text-[#555] border-b border-[#1A1A1E] font-medium">
+              <div className="grid grid-cols-[36px_minmax(0,1fr)_52px_40px] md:grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-2 md:gap-4 px-3 md:px-4 py-3 text-xs text-[#555] border-b border-[#1A1A1E] font-medium">
                 <span>#</span>
                 <span>TITLE</span>
                 <span className="hidden md:block">GENRE</span>
@@ -238,7 +238,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                 <span className="hidden lg:block">KEY</span>
                 <span>TIME</span>
                 <span className="hidden lg:block">MOOD</span>
-                <span></span>
+                <span />
               </div>
               {filteredTracks.map((track, index) => {
                 const isPlaying = currentTrack?.id === track.id && playing
@@ -252,7 +252,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                     onClick={() => setSelectedTrack(track)}
                     onMouseEnter={() => setHoveredTrack(track.id)}
                     onMouseLeave={() => setHoveredTrack(null)}
-                    className={`grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-4 px-4 py-2.5 items-center cursor-pointer transition-colors ${
+                    className={`grid grid-cols-[36px_minmax(0,1fr)_52px_40px] md:grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-2 md:gap-4 px-3 md:px-4 py-2.5 items-center cursor-pointer transition-colors ${
                       isCurrent ? 'bg-[#C8A97E]/10' : isHovered ? 'bg-[#1A1A1E]' : ''
                     }`}
                   >
@@ -277,7 +277,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                     <span className="text-sm text-[#888] hidden md:block truncate">{track.genre || '-'}</span>
                     <span className="text-sm text-[#888] hidden md:block">{track.bpm || '-'}</span>
                     <span className="text-sm text-[#888] hidden lg:block">{track.key || '-'}</span>
-                    <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
+                    <span className="text-sm text-[#888] tabular-nums">{formatTrackDurationMmSs(track)}</span>
                     <div className="hidden lg:block">{track.mood && <MoodPill mood={track.mood} />}</div>
                     <button
                       onClick={(e) => toggleSave(e, track.id)}

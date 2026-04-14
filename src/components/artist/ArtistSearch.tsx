@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
@@ -22,11 +22,7 @@ export function ArtistSearch({ profile, onPlayTrack, currentTrack, playing }: Ar
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [tracksRes, savedRes] = await Promise.all([
       supabase.from('tracks').select('*').eq('status', 'active').order('created_at', { ascending: false }),
@@ -36,7 +32,11 @@ export function ArtistSearch({ profile, onPlayTrack, currentTrack, playing }: Ar
     if (tracksRes.data) setTracks(tracksRes.data)
     if (savedRes.data) setSavedTracks(new Set(savedRes.data.map(s => s.track_id)))
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const toggleSave = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation()

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS } from '../../lib/constants'
@@ -87,11 +87,7 @@ export function BriefTracking({ profile, onPlayTrack, currentTrack, playing }: B
   const [selectedBriefId, setSelectedBriefId] = useState<string | null>(null)
   const [showCreator, setShowCreator] = useState(false)
 
-  useEffect(() => {
-    loadBriefs()
-  }, [profile.id])
-
-  const loadBriefs = async () => {
+  const loadBriefs = useCallback(async () => {
     setLoading(true)
 
     const { data: briefsData, error } = await supabase
@@ -123,13 +119,19 @@ export function BriefTracking({ profile, onPlayTrack, currentTrack, playing }: B
       }))
 
       setBriefs(briefsWithDetails)
-      if (briefsWithDetails.length > 0 && !selectedBriefId) {
-        setSelectedBriefId(briefsWithDetails[0].id)
-      }
+      setSelectedBriefId(prev => {
+        if (briefsWithDetails.length === 0) return null
+        if (prev && briefsWithDetails.some(b => b.id === prev)) return prev
+        return briefsWithDetails[0].id
+      })
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadBriefs()
+  }, [loadBriefs])
 
   const selectedBrief = briefs.find(b => b.id === selectedBriefId)
 

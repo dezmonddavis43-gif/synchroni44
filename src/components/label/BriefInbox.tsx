@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Spinner, EmptyState, MoodPill } from '../shared/UI'
 import { BriefResponse } from './BriefResponse'
@@ -55,11 +55,7 @@ export function BriefInbox({ profile, onPlayTrack, currentTrack, playing }: Brie
   const [loading, setLoading] = useState(true)
   const [selectedBrief, setSelectedBrief] = useState<BriefSendWithDetails | null>(null)
 
-  useEffect(() => {
-    loadBriefs()
-  }, [profile.id])
-
-  const loadBriefs = async () => {
+  const loadBriefs = useCallback(async () => {
     setLoading(true)
 
     const { data, error } = await supabase
@@ -105,7 +101,11 @@ export function BriefInbox({ profile, onPlayTrack, currentTrack, playing }: Brie
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadBriefs()
+  }, [loadBriefs])
 
   const handleBriefClick = async (briefSend: BriefSendWithDetails) => {
     if (!briefSend.opened) {

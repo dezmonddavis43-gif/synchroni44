@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Select, PageTitle, StatCard, StatusBadge, Spinner, EmptyState, Tabs } from '../shared/UI'
 import { Plus, X, Scale } from 'lucide-react'
@@ -24,11 +24,7 @@ export function Licensing({ profile }: LicensingProps) {
     fee_offered: 0
   })
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [requestsRes, tracksRes, projectsRes] = await Promise.all([
       supabase
@@ -44,7 +40,11 @@ export function Licensing({ profile }: LicensingProps) {
     if (tracksRes.data) setTracks(tracksRes.data)
     if (projectsRes.data) setProjects(projectsRes.data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const createRequest = async () => {
     if (!form.track_id) return

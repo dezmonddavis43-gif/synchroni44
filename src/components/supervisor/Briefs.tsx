@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Textarea, Select, PageTitle, StatusBadge, Spinner, EmptyState } from '../shared/UI'
 import { MOODS, GENRES } from '../../lib/constants'
@@ -61,11 +61,7 @@ export function Briefs({ profile }: BriefsProps) {
     exclusivity: false
   })
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const { data: briefsData } = await supabase
       .from('briefs')
@@ -95,7 +91,11 @@ export function Briefs({ profile }: BriefsProps) {
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const saveBrief = async () => {
     if (!briefForm.title) return

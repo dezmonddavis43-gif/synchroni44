@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, PageTitle, StatCard, Spinner } from '../shared/UI'
 import { Plus, X, GripVertical } from 'lucide-react'
@@ -31,11 +31,7 @@ export function PitchTracker({ profile }: PitchTrackerProps) {
     notes: ''
   })
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [pitchesRes, tracksRes] = await Promise.all([
       supabase.from('pitches').select('*, track:tracks(*)').eq('label_id', profile.id).order('created_at', { ascending: false }),
@@ -45,7 +41,11 @@ export function PitchTracker({ profile }: PitchTrackerProps) {
     if (pitchesRes.data) setPitches(pitchesRes.data)
     if (tracksRes.data) setTracks(tracksRes.data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const createPitch = async () => {
     if (!form.track_id || !form.supervisor_name) return

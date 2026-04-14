@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, PageTitle, Spinner, EmptyState } from '../shared/UI'
 import { Plus, Users, Music2, Search, Trash2 } from 'lucide-react'
@@ -19,11 +19,7 @@ export function Roster({ profile }: RosterProps) {
   const [searchResults, setSearchResults] = useState<Profile[]>([])
   const [selectedArtist, setSelectedArtist] = useState<LabelRosterMember | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [membersRes, artistsRes, tracksRes, pitchesRes] = await Promise.all([
       supabase
@@ -40,7 +36,11 @@ export function Roster({ profile }: RosterProps) {
     if (tracksRes.data) setTracks(tracksRes.data)
     if (pitchesRes.data) setPitches(pitchesRes.data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const searchArtists = (query: string) => {
     setSearchQuery(query)

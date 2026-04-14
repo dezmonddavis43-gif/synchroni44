@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { X, Play, Pause, Download, FileAudio, Music } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner } from './UI'
@@ -42,12 +42,6 @@ export function TrackDetailModal({
   const moodColor = track.mood ? MOOD_COLORS[track.mood] || '#C8A97E' : '#C8A97E'
 
   useEffect(() => {
-    if (activeTab === 'similar') {
-      loadSimilarTracks()
-    }
-  }, [activeTab, track.id])
-
-  useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -59,7 +53,7 @@ export function TrackDetailModal({
     }
   }, [onClose])
 
-  const loadSimilarTracks = async () => {
+  const loadSimilarTracks = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('tracks')
@@ -70,7 +64,13 @@ export function TrackDetailModal({
       .limit(6)
     if (data) setSimilarTracks(data)
     setLoading(false)
-  }
+  }, [track.id, track.mood, track.genre])
+
+  useEffect(() => {
+    if (activeTab === 'similar') {
+      void loadSimilarTracks()
+    }
+  }, [activeTab, track.id, loadSimilarTracks])
 
   if (!isOpen) return null
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, PageTitle, StatCard, Spinner } from '../shared/UI'
 import type { Profile, Track, Pitch } from '../../lib/types'
@@ -32,11 +32,7 @@ export function LabelAnalytics({ profile }: LabelAnalyticsProps) {
   const [thisMonth, setThisMonth] = useState(0)
   const [pipelineValue, setPipelineValue] = useState(0)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [tracksRes, pitchesRes] = await Promise.all([
       supabase.from('tracks').select('*').eq('label_id', profile.id),
@@ -63,7 +59,11 @@ export function LabelAnalytics({ profile }: LabelAnalyticsProps) {
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const getTrackStats = (): TrackStats[] => {
     return tracks.map(track => {

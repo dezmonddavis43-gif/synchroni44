@@ -80,34 +80,33 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
     }
   }, [externalSearchQuery])
 
-  useEffect(() => {
-    loadData()
-  }, [profile?.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('tracks')
       .select('*')
       .eq('status', 'active')
       .order('play_count', { ascending: false })
 
-    console.log('Tracks loaded:', data?.length, error)
-
     if (data) setTracks(data)
 
-    if (profile) {
-      const savedRes = await supabase.from('saved_tracks').select('track_id').eq('user_id', profile.id)
+    const uid = profile?.id
+    if (uid) {
+      const savedRes = await supabase.from('saved_tracks').select('track_id').eq('user_id', uid)
       if (savedRes.data) setSavedTracks(new Set(savedRes.data.map(s => s.track_id)))
     }
     setLoading(false)
-  }
+  }, [profile?.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     await loadData()
     setRefreshing(false)
-  }, [profile?.id])
+  }, [loadData])
 
   const handlePullStart = (e: React.TouchEvent) => {
     if (containerRef.current && containerRef.current.scrollTop <= 0) {
@@ -775,7 +774,7 @@ function MobileTrackRow({ track, isPlaying, isSaved, isSwiped, onPlay, onToggleS
     if (!isSwiped && translateX !== 0) {
       setTranslateX(0)
     }
-  }, [isSwiped])
+  }, [isSwiped, translateX])
 
   return (
     <div className="relative overflow-hidden rounded-lg">

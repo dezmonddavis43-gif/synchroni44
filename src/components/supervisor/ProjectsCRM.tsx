@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, Input, Textarea, PageTitle, Spinner, EmptyState } from '../shared/UI'
 import { Plus, Table, Columns3, Download, StickyNote, X, ChevronDown, GripVertical, Check } from 'lucide-react'
@@ -235,11 +235,7 @@ export function ProjectsCRM({ profile }: ProjectsCRMProps) {
   const touchCurrentX = useRef(0)
   const [swipeOffset, setSwipeOffset] = useState(0)
 
-  useEffect(() => {
-    loadProjects()
-  }, [profile.id])
-
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('projects')
@@ -274,7 +270,11 @@ export function ProjectsCRM({ profile }: ProjectsCRMProps) {
       setProjects([...SEED_DATA, ...mappedProjects])
     }
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadProjects()
+  }, [loadProjects])
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setScrollLeft(e.currentTarget.scrollLeft)

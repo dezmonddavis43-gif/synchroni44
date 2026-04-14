@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Card, Btn, PageTitle, StatCard, StatusBadge, Spinner, EmptyState, Tabs } from '../shared/UI'
 import { Play, Pause, Check, X, ListMusic, Copy, Inbox as InboxIcon } from 'lucide-react'
@@ -18,11 +18,7 @@ export function Inbox({ profile, onPlayTrack, currentTrack, playing }: InboxProp
   const [activeTab, setActiveTab] = useState('All')
   const [showPlaylistPicker, setShowPlaylistPicker] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     const [submissionsRes, playlistsRes] = await Promise.all([
       supabase
@@ -39,7 +35,11 @@ export function Inbox({ profile, onPlayTrack, currentTrack, playing }: InboxProp
     if (submissionsRes.data) setSubmissions(submissionsRes.data)
     if (playlistsRes.data) setPlaylists(playlistsRes.data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const updateSubmissionStatus = async (id: string, status: 'accepted' | 'passed') => {
     await supabase.from('inbox_submissions').update({ status }).eq('id', id)

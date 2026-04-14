@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Btn, MoodPill, Textarea, EmptyState, Spinner } from '../shared/UI'
 import { MOODS, GENRES } from '../../lib/constants'
@@ -39,11 +39,7 @@ export function WorkspaceLayout({ profile, onPlayTrack, currentTrack, playing }:
 
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [projectsRes, playlistsRes, tracksRes] = await Promise.all([
@@ -60,7 +56,11 @@ export function WorkspaceLayout({ profile, onPlayTrack, currentTrack, playing }:
     } finally {
       setLoading(false)
     }
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const loadPlaylistTracks = async (playlistId: string) => {
     const { data } = await supabase

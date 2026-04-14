@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Card, PageTitle } from '../shared/UI'
 import { DollarSign, TrendingUp, Music2, FileText, Download, ChevronRight, ArrowUpRight, Play, Briefcase, Percent, Info } from 'lucide-react'
 import type { Profile } from '../../lib/types'
+import { ROLE_COLORS } from '../../lib/constants'
 
 interface EarningsProps {
   profile: Profile
@@ -13,13 +14,13 @@ const DEMO_DATA = {
     thisMonth: 3840,
     pending: 8500,
     totalPlays: 47832,
-    proSyncDeals: { count: 12, total: 38500 },
-    microLicenses: { count: 143, total: 8750 },
+    proSyncPlacements: { count: 12, total: 38500 },
+    microUsage: { count: 143, total: 8750 },
     platformFee: 9450,
     netEarnings: 37800
   },
   label: {
-    totalLicensedValue: 2847500,
+    totalDealValue: 2847500,
     thisMonth: 184000,
     activePipeline: 650000,
     totalTracks: 847,
@@ -29,26 +30,27 @@ const DEMO_DATA = {
 }
 
 const DEMO_TRANSACTIONS = [
-  { id: '1', date: '2026-03-24', type: 'license' as const, description: 'Nike Summer Campaign - "Golden Summer"', amount: 8500, status: 'completed' as const },
-  { id: '2', date: '2026-03-20', type: 'license' as const, description: 'Netflix Drama - "Midnight Protocol"', amount: 4200, status: 'completed' as const },
-  { id: '3', date: '2026-03-18', type: 'micro' as const, description: 'YouTube Creator License - "Electric Feel"', amount: 89, status: 'completed' as const },
-  { id: '4', date: '2026-03-15', type: 'license' as const, description: 'Toyota Holiday Campaign - "Harvest Moon"', amount: 12500, status: 'completed' as const },
-  { id: '5', date: '2026-03-12', type: 'micro' as const, description: 'Podcast License - "Velvet Sunrise"', amount: 49, status: 'completed' as const },
-  { id: '6', date: '2026-03-10', type: 'license' as const, description: 'HBO Documentary - "Freedom March"', amount: 6800, status: 'completed' as const },
-  { id: '7', date: '2026-03-08', type: 'payout' as const, description: 'Monthly Payout - February', amount: 15200, status: 'completed' as const },
+  { id: '1', date: '2026-03-24', type: 'sync' as const, description: 'Nike Summer Campaign — sync placement — "Golden Summer"', amount: 8500, status: 'completed' as const },
+  { id: '2', date: '2026-03-20', type: 'sync' as const, description: 'Netflix drama — track usage — "Midnight Protocol"', amount: 4200, status: 'completed' as const },
+  { id: '3', date: '2026-03-18', type: 'usage' as const, description: 'YouTube creator usage — "Electric Feel"', amount: 89, status: 'completed' as const },
+  { id: '4', date: '2026-03-15', type: 'sync' as const, description: 'Toyota holiday spot — "Harvest Moon"', amount: 12500, status: 'completed' as const },
+  { id: '5', date: '2026-03-12', type: 'usage' as const, description: 'Podcast episode usage — "Velvet Sunrise"', amount: 49, status: 'completed' as const },
+  { id: '6', date: '2026-03-10', type: 'sync' as const, description: 'HBO documentary — "Freedom March"', amount: 6800, status: 'completed' as const },
+  { id: '7', date: '2026-03-08', type: 'payout' as const, description: 'Monthly platform payout — February', amount: 15200, status: 'completed' as const },
 ]
 
 const TOP_TRACKS = [
-  { id: '1', title: 'Golden Summer', totalEarnings: 12500, licenseCount: 3 },
-  { id: '2', title: 'Freedom March', totalEarnings: 9800, licenseCount: 2 },
-  { id: '3', title: 'Midnight Protocol', totalEarnings: 7400, licenseCount: 2 },
-  { id: '4', title: 'Harvest Moon', totalEarnings: 6200, licenseCount: 1 },
-  { id: '5', title: 'Electric Feel', totalEarnings: 4350, licenseCount: 4 },
+  { id: '1', title: 'Golden Summer', totalEarnings: 12500, placementCount: 3 },
+  { id: '2', title: 'Freedom March', totalEarnings: 9800, placementCount: 2 },
+  { id: '3', title: 'Midnight Protocol', totalEarnings: 7400, placementCount: 2 },
+  { id: '4', title: 'Harvest Moon', totalEarnings: 6200, placementCount: 1 },
+  { id: '5', title: 'Electric Feel', totalEarnings: 4350, placementCount: 4 },
 ]
 
 export function Earnings({ profile }: EarningsProps) {
   const [period, setPeriod] = useState<'all' | 'year' | 'month'>('all')
   const isLabel = profile.role === 'label'
+  const accent = isLabel ? ROLE_COLORS.label : ROLE_COLORS.artist
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -71,7 +73,7 @@ export function Earnings({ profile }: EarningsProps) {
     return (
       <div className="p-4 md:p-6 h-[calc(100vh-76px)] overflow-y-auto pb-40 md:pb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <PageTitle title="Label Analytics" sub="Track your catalog's licensing performance" />
+          <PageTitle title="Label analytics" sub="Sync placements and catalog performance" />
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 bg-[#C8A97E]/10 text-[#C8A97E] text-xs rounded-full flex items-center gap-1">
               <Info className="w-3 h-3" /> Demo data
@@ -86,8 +88,8 @@ export function Earnings({ profile }: EarningsProps) {
                 <DollarSign className="w-5 h-5 text-[#4DFFB4]" />
               </div>
             </div>
-            <p className="text-2xl md:text-3xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.label.totalLicensedValue)}</p>
-            <p className="text-xs text-[#666] mt-1">Total Licensed</p>
+            <p className="text-2xl md:text-3xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.label.totalDealValue)}</p>
+            <p className="text-xs text-[#666] mt-1">Total deal value</p>
           </Card>
 
           <Card className="p-4">
@@ -150,21 +152,23 @@ export function Earnings({ profile }: EarningsProps) {
   return (
     <div className="p-4 md:p-6 h-[calc(100vh-76px)] overflow-y-auto pb-40 md:pb-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <PageTitle title="Earnings" sub="Track your sync licensing revenue" />
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-1 bg-[#C8A97E]/10 text-[#C8A97E] text-xs rounded-full flex items-center gap-1">
+        <PageTitle title="Earnings" sub="Sync placements, track usage, and platform payouts" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2 py-1 text-xs rounded-full flex items-center gap-1" style={{ background: `${accent}18`, color: accent }}>
             <Info className="w-3 h-3" /> Demo data
           </span>
           <div className="flex gap-2">
             {(['all', 'year', 'month'] as const).map(p => (
               <button
                 key={p}
+                type="button"
                 onClick={() => setPeriod(p)}
                 className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                   period === p
-                    ? 'bg-[#C8A97E] text-[#0A0A0C]'
+                    ? 'text-[#0A0A0C]'
                     : 'bg-[#1A1A1E] text-[#888] hover:text-[#E8E8E8]'
                 }`}
+                style={period === p ? { background: accent } : undefined}
               >
                 {p === 'all' ? 'All Time' : p === 'year' ? 'This Year' : 'This Month'}
               </button>
@@ -221,25 +225,25 @@ export function Earnings({ profile }: EarningsProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-[#888]">Professional Sync Deals</h4>
-            <Briefcase className="w-4 h-4 text-[#C8A97E]" />
+            <h4 className="text-sm font-medium text-[#888]">Pro sync placements</h4>
+            <Briefcase className="w-4 h-4" style={{ color: accent }} />
           </div>
-          <p className="text-2xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.artist.proSyncDeals.total)}</p>
-          <p className="text-xs text-[#666]">{DEMO_DATA.artist.proSyncDeals.count} deals</p>
+          <p className="text-2xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.artist.proSyncPlacements.total)}</p>
+          <p className="text-xs text-[#666]">{DEMO_DATA.artist.proSyncPlacements.count} placements</p>
         </Card>
 
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-[#888]">Micro Licenses</h4>
-            <FileText className="w-4 h-4 text-[#7B9CFF]" />
+            <h4 className="text-sm font-medium text-[#888]">Micro usage</h4>
+            <FileText className="w-4 h-4" style={{ color: accent }} />
           </div>
-          <p className="text-2xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.artist.microLicenses.total)}</p>
-          <p className="text-xs text-[#666]">{DEMO_DATA.artist.microLicenses.count} licenses</p>
+          <p className="text-2xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.artist.microUsage.total)}</p>
+          <p className="text-xs text-[#666]">{DEMO_DATA.artist.microUsage.count} usages</p>
         </Card>
 
         <Card className="p-4 border-l-4 border-l-[#FF6B6B]">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-[#888]">Platform Fee (20%)</h4>
+            <h4 className="text-sm font-medium text-[#888]">Platform fee (20%)</h4>
             <Percent className="w-4 h-4 text-[#FF6B6B]" />
           </div>
           <p className="text-2xl font-semibold text-[#FF6B6B]">-{formatCurrency(DEMO_DATA.artist.platformFee)}</p>
@@ -254,9 +258,13 @@ export function Earnings({ profile }: EarningsProps) {
               <p className="text-sm text-[#888]">Pending Payouts</p>
               <p className="text-xl font-semibold text-[#E8E8E8]">{formatCurrency(DEMO_DATA.artist.pending)}</p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#C8A97E] text-[#0A0A0C] rounded-lg font-medium text-sm hover:bg-[#D4B88A] transition-colors">
+            <button
+              type="button"
+              className="flex items-center gap-2 px-4 py-2 text-[#0A0A0C] rounded-lg font-medium text-sm transition-colors hover:opacity-90"
+              style={{ background: accent }}
+            >
               <Download className="w-4 h-4" />
-              Request Payout
+              Request payout
             </button>
           </div>
         </Card>
@@ -267,8 +275,8 @@ export function Earnings({ profile }: EarningsProps) {
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-[#E8E8E8]">Recent Transactions</h3>
-              <button className="text-sm text-[#C8A97E] hover:underline flex items-center gap-1">
-                View All <ChevronRight className="w-4 h-4" />
+              <button type="button" className="text-sm hover:underline flex items-center gap-1" style={{ color: accent }}>
+                View all <ChevronRight className="w-4 h-4" />
               </button>
             </div>
 
@@ -279,13 +287,13 @@ export function Earnings({ profile }: EarningsProps) {
                   className="flex items-center gap-4 p-3 bg-[#0A0A0C] rounded-lg"
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    txn.type === 'license' ? 'bg-[#4DFFB4]/10' :
-                    txn.type === 'micro' ? 'bg-[#7B9CFF]/10' :
+                    txn.type === 'sync' ? 'bg-[#4DFFB4]/10' :
+                    txn.type === 'usage' ? 'bg-[#7B9CFF]/10' :
                     txn.type === 'payout' ? 'bg-[#FF6B9D]/10' : 'bg-[#666]/10'
                   }`}>
-                    {txn.type === 'license' ? (
+                    {txn.type === 'sync' ? (
                       <Briefcase className="w-5 h-5 text-[#4DFFB4]" />
-                    ) : txn.type === 'micro' ? (
+                    ) : txn.type === 'usage' ? (
                       <FileText className="w-5 h-5 text-[#7B9CFF]" />
                     ) : (
                       <Download className="w-5 h-5 text-[#FF6B9D]" />
@@ -319,12 +327,12 @@ export function Earnings({ profile }: EarningsProps) {
                   key={track.id}
                   className="flex items-center gap-3 p-3 bg-[#0A0A0C] rounded-lg"
                 >
-                  <div className="w-8 h-8 bg-[#C8A97E]/20 rounded-lg flex items-center justify-center text-sm font-bold text-[#C8A97E]">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: `${accent}22`, color: accent }}>
                     {index + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#E8E8E8] truncate">{track.title}</p>
-                    <p className="text-xs text-[#666]">{track.licenseCount} license{track.licenseCount !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-[#666]">{track.placementCount} placement{track.placementCount !== 1 ? 's' : ''}</p>
                   </div>
                   <p className="text-sm font-medium text-[#4DFFB4]">
                     {formatCurrency(track.totalEarnings)}
@@ -349,8 +357,8 @@ export function Earnings({ profile }: EarningsProps) {
                 <span className="text-sm text-[#888]">Payout Schedule</span>
                 <span className="text-sm text-[#E8E8E8]">Monthly</span>
               </div>
-              <button className="w-full mt-2 py-2 text-sm text-[#C8A97E] hover:bg-[#C8A97E]/10 rounded-lg transition-colors">
-                Update Payment Settings
+              <button type="button" className="w-full mt-2 py-2 text-sm rounded-lg transition-colors hover:bg-white/5" style={{ color: accent }}>
+                Update payment settings
               </button>
             </div>
           </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Spinner, EmptyState } from '../shared/UI'
 import { Plus, Search, X, CreditCard as Edit2, Trash2, Upload, Send, User, Mail } from 'lucide-react'
@@ -27,11 +27,7 @@ export function ContactManager({ profile, onSendBrief }: ContactManagerProps) {
   const [formEmail, setFormEmail] = useState('')
   const [formType, setFormType] = useState('label')
 
-  useEffect(() => {
-    loadContacts()
-  }, [profile.id])
-
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('brief_contacts')
@@ -45,7 +41,11 @@ export function ContactManager({ profile, onSendBrief }: ContactManagerProps) {
       setContacts(data)
     }
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadContacts()
+  }, [loadContacts])
 
   const filteredContacts = contacts.filter(contact => {
     const matchesSearch = !searchQuery ||

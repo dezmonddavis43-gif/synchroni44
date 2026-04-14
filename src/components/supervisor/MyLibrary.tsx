@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
@@ -44,11 +44,7 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
 
   const featuredScrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [profile.id])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
 
     const thirtyDaysAgo = new Date()
@@ -103,7 +99,11 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
     }
 
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const toggleSave = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation()
@@ -350,14 +350,14 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
 
           {filteredTracks.length > 0 ? (
             <div className="rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
+              <div className="grid grid-cols-[36px_minmax(0,1fr)_52px_auto] md:grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-2 md:gap-4 px-3 md:px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
                 <span>#</span>
                 <span>Title</span>
-                <span>Genre</span>
-                <span>BPM</span>
-                <span>Mood</span>
+                <span className="hidden md:block">Genre</span>
+                <span className="hidden md:block">BPM</span>
+                <span className="hidden md:block">Mood</span>
                 <span>Duration</span>
-                <span>Catalog</span>
+                <span className="hidden md:block">Catalog</span>
                 <span className="text-right">Actions</span>
               </div>
               {filteredTracks.map((track, index) => (
@@ -457,7 +457,7 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
 
   return (
     <div
-      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
+      className={`grid grid-cols-[36px_minmax(0,1fr)_52px_auto] md:grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-2 md:gap-4 px-3 md:px-4 py-3 items-center cursor-pointer transition-colors ${
         hovered ? 'bg-[#1A1A1E]' : index % 2 === 0 ? 'bg-[#0D0D10]' : 'bg-transparent'
       } ${isPlaying ? 'bg-[#C8A97E]/10' : ''}`}
       onMouseEnter={() => setHovered(true)}
@@ -493,17 +493,17 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         </div>
       </div>
 
-      <span className="text-sm text-[#888] truncate">{track.genre || '-'}</span>
+      <span className="hidden md:block text-sm text-[#888] truncate">{track.genre || '-'}</span>
 
-      <span className="text-sm text-[#888]">{track.bpm || '-'}</span>
+      <span className="hidden md:block text-sm text-[#888]">{track.bpm || '-'}</span>
 
-      <div>
+      <div className="hidden md:block">
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
+      <span className="text-sm text-[#888] tabular-nums">{formatTrackDurationMmSs(track)}</span>
 
-      <span className="text-sm text-[#888] capitalize">{track.status || '-'}</span>
+      <span className="hidden md:block text-sm text-[#888] capitalize">{track.status || '-'}</span>
 
       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
         <button

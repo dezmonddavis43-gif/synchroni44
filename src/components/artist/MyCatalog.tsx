@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MoodPill, Spinner, EmptyState, Btn, Input, Select, Textarea } from '../shared/UI'
 import { ArtistLink } from '../shared/ArtistLink'
@@ -48,11 +48,7 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
 
   const featuredScrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    loadTracks()
-  }, [profile.id])
-
-  const loadTracks = async () => {
+  const loadTracks = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('tracks')
@@ -62,7 +58,11 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
 
     if (data) setTracks(data)
     setLoading(false)
-  }
+  }, [profile.id])
+
+  useEffect(() => {
+    void loadTracks()
+  }, [loadTracks])
 
   const getStatusCount = (status: StatusTab) => {
     if (status === 'all') return tracks.length
