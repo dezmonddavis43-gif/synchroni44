@@ -201,8 +201,9 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
             <h1 className="font-['Playfair_Display'] text-2xl font-semibold text-[#E8E8E8]">My Catalog</h1>
             <p className="text-[#666] text-sm mt-1">Manage your uploaded tracks</p>
           </div>
-          {onNavigateToSearch && (
+          {profile.role === 'supervisor' && onNavigateToSearch && (
             <button
+              type="button"
               onClick={onNavigateToSearch}
               className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1E] border border-[#2A2A2E] rounded-lg text-sm text-[#888] hover:text-[#E8E8E8] hover:border-[#C8A97E] transition-colors"
             >

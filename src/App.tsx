@@ -220,7 +220,7 @@ function App() {
       case 'inbox': return <Inbox profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
       case 'briefs': return <Briefs profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
       case 'licensing': return <Licensing profile={previewProfile} />
-      case 'my-catalog': return <MyCatalog profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} onNavigateToSearch={() => setActiveTab('search')} />
+      case 'my-catalog': return <MyCatalog profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} onNavigateToSearch={viewingRole === 'supervisor' ? () => setActiveTab('search') : undefined} />
       case 'upload': return <Upload profile={previewProfile} />
       case 'opportunities': return <Opportunities profile={previewProfile} />
       case 'ai-pitch': return <AIPlaylistCreator profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
