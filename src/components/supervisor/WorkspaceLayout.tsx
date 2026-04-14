@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Btn, MoodPill, ClearanceBadge, Textarea, EmptyState, Spinner } from '../shared/UI'
+import { Btn, MoodPill, Textarea, EmptyState, Spinner } from '../shared/UI'
 import { MOODS, GENRES } from '../../lib/constants'
 import {
   ChevronLeft, ChevronRight, Play, Pause, GripVertical, Plus, X, Search,
@@ -430,8 +430,6 @@ Return ONLY valid JSON:
                       </div>
                       {pt.track?.mood && <MoodPill mood={pt.track.mood} />}
                       <span className="text-xs text-[#555]">{pt.track?.bpm} BPM</span>
-                      {pt.track?.clearance_status && <ClearanceBadge status={pt.track.clearance_status} />}
-                      <span className="text-xs text-[#C8A97E]">${pt.track?.one_stop_fee || '—'}</span>
                       <input
                         type="text"
                         value={pt.notes || ''}

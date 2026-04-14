@@ -1,22 +1,16 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import { Search, Play, Pause, Heart, X } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface ArtistSearchProps {
   profile: Profile
   onPlayTrack: (track: Track) => void
   currentTrack: Track | null
   playing: boolean
-}
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 export function ArtistSearch({ profile, onPlayTrack, currentTrack, playing }: ArtistSearchProps) {
@@ -195,14 +189,14 @@ export function ArtistSearch({ profile, onPlayTrack, currentTrack, playing }: Ar
 
         {filteredTracks.length > 0 ? (
           <div className="rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_80px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
+            <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_40px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
               <span>#</span>
               <span>Title</span>
               <span>Genre</span>
               <span>BPM</span>
               <span>Mood</span>
               <span>Duration</span>
-              <span>Clearance</span>
+              <span>Catalog</span>
               <span className="text-right">Save</span>
             </div>
             {filteredTracks.map((track, index) => (
@@ -245,7 +239,7 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
 
   return (
     <div
-      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_80px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
+      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_40px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
         hovered ? 'bg-[#1A1A1E]' : index % 2 === 0 ? 'bg-[#0D0D10]' : 'bg-transparent'
       } ${isPlaying ? 'bg-[#C8A97E]/10' : ''}`}
       onMouseEnter={() => setHovered(true)}
@@ -289,15 +283,9 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
 
-      <div>
-        {track.clearance_status ? (
-          <ClearanceBadge status={track.clearance_status} />
-        ) : (
-          <span className="text-sm text-[#555]">-</span>
-        )}
-      </div>
+      <span className="text-sm text-[#888] capitalize">{track.status || '-'}</span>
 
       <div className="flex justify-end" onClick={e => e.stopPropagation()}>
         <button

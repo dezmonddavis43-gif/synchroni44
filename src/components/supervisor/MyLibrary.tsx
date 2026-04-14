@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import {
   Search, Play, Pause, Heart, ChevronRight, ChevronLeft, X, ListPlus,
-  FileText, Clock, CheckCircle
+  Clock, CheckCircle
 } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface MyLibraryProps {
   profile: Profile
@@ -22,15 +23,6 @@ const LIBRARY_TABS: { id: LibraryTab; label: string; icon: React.ReactNode }[] =
   { id: 'recent', label: 'Recently Played', icon: <Clock className="w-4 h-4" /> },
   { id: 'licensed', label: 'Licensed', icon: <CheckCircle className="w-4 h-4" /> }
 ]
-
-const CLEARANCE_OPTIONS = ['All', 'Cleared', 'PRO', 'Pending']
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 function getMoodGradient(mood?: string): string {
   const color = mood ? MOOD_COLORS[mood] || '#C8A97E' : '#C8A97E'
@@ -49,7 +41,6 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
   const [selectedMood, setSelectedMood] = useState('All')
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
-  const [clearanceFilter, setClearanceFilter] = useState('All')
 
   const featuredScrollRef = useRef<HTMLDivElement>(null)
 
@@ -151,13 +142,7 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
     const matchesGenre = selectedGenre === 'All' || track.genre === selectedGenre
     const matchesBpm = !track.bpm || (track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1])
 
-    let matchesClearance = true
-    if (clearanceFilter !== 'All') {
-      const statusMap: Record<string, string> = { 'Cleared': 'CLEAR', 'PRO': 'PRO', 'Pending': 'PENDING' }
-      matchesClearance = track.clearance_status === statusMap[clearanceFilter]
-    }
-
-    return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesClearance
+    return matchesSearch && matchesMood && matchesGenre && matchesBpm
   })
 
   const recentlySaved = savedTracks.slice(0, 8)
@@ -174,11 +159,10 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
     setSelectedMood('All')
     setSelectedGenre('All')
     setBpmRange([60, 180])
-    setClearanceFilter('All')
   }
 
   const hasActiveFilters = searchQuery || selectedMood !== 'All' || selectedGenre !== 'All' ||
-    bpmRange[0] !== 60 || bpmRange[1] !== 180 || clearanceFilter !== 'All'
+    bpmRange[0] !== 60 || bpmRange[1] !== 180
 
   const getEmptyMessage = () => {
     switch (activeTab) {
@@ -308,16 +292,6 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
             />
           </div>
 
-          <select
-            value={clearanceFilter}
-            onChange={e => setClearanceFilter(e.target.value)}
-            className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-4 py-2 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
-          >
-            {CLEARANCE_OPTIONS.map(option => (
-              <option key={option} value={option}>{option === 'All' ? 'All Clearance' : option}</option>
-            ))}
-          </select>
-
           {hasActiveFilters && (
             <button
               onClick={clearAllFilters}
@@ -376,14 +350,14 @@ export function MyLibrary({ profile, onPlayTrack, currentTrack, playing }: MyLib
 
           {filteredTracks.length > 0 ? (
             <div className="rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_120px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
+              <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
                 <span>#</span>
                 <span>Title</span>
                 <span>Genre</span>
                 <span>BPM</span>
                 <span>Mood</span>
                 <span>Duration</span>
-                <span>Status</span>
+                <span>Catalog</span>
                 <span className="text-right">Actions</span>
               </div>
               {filteredTracks.map((track, index) => (
@@ -483,7 +457,7 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
 
   return (
     <div
-      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
+      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_120px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
         hovered ? 'bg-[#1A1A1E]' : index % 2 === 0 ? 'bg-[#0D0D10]' : 'bg-transparent'
       } ${isPlaying ? 'bg-[#C8A97E]/10' : ''}`}
       onMouseEnter={() => setHovered(true)}
@@ -527,15 +501,9 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
 
-      <div>
-        {track.clearance_status ? (
-          <ClearanceBadge status={track.clearance_status} />
-        ) : (
-          <span className="text-sm text-[#555]">-</span>
-        )}
-      </div>
+      <span className="text-sm text-[#888] capitalize">{track.status || '-'}</span>
 
       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
         <button
@@ -552,12 +520,6 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
           title="Add to playlist"
         >
           <ListPlus className="w-4 h-4" />
-        </button>
-        <button
-          className="p-1.5 rounded text-[#888] hover:text-[#C8A97E] hover:bg-[#C8A97E]/20 transition-colors"
-          title="Request license"
-        >
-          <FileText className="w-4 h-4" />
         </button>
       </div>
     </div>

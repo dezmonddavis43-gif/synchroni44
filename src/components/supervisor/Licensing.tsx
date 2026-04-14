@@ -20,8 +20,6 @@ export function Licensing({ profile }: LicensingProps) {
     track_id: '',
     project_id: '',
     license_type: 'one_stop',
-    usage_type: '',
-    territory: '',
     term: '',
     fee_offered: 0
   })
@@ -54,7 +52,11 @@ export function Licensing({ profile }: LicensingProps) {
     const { data, error } = await supabase
       .from('license_requests')
       .insert({
-        ...form,
+        track_id: form.track_id,
+        project_id: form.project_id || null,
+        license_type: form.license_type || 'one_stop',
+        term: form.term || null,
+        fee_offered: form.fee_offered ?? null,
         supervisor_id: profile.id,
         status: 'pending'
       })
@@ -68,8 +70,6 @@ export function Licensing({ profile }: LicensingProps) {
         track_id: '',
         project_id: '',
         license_type: 'one_stop',
-        usage_type: '',
-        territory: '',
         term: '',
         fee_offered: 0
       })
@@ -155,18 +155,6 @@ export function Licensing({ profile }: LicensingProps) {
               <option value="quote">Quote Request</option>
             </Select>
             <Input
-              label="Usage Type"
-              value={form.usage_type || ''}
-              onChange={e => setForm({ ...form, usage_type: e.target.value })}
-              placeholder="e.g., TV Commercial, Film, Trailer"
-            />
-            <Input
-              label="Territory"
-              value={form.territory || ''}
-              onChange={e => setForm({ ...form, territory: e.target.value })}
-              placeholder="e.g., Worldwide, US Only"
-            />
-            <Input
               label="Term"
               value={form.term || ''}
               onChange={e => setForm({ ...form, term: e.target.value })}
@@ -224,7 +212,7 @@ export function Licensing({ profile }: LicensingProps) {
 
                 <div className="text-right">
                   <p className="text-sm text-[#888]">{request.project?.name || 'No project'}</p>
-                  <p className="text-xs text-[#555]">{request.usage_type}</p>
+                  {request.term && <p className="text-xs text-[#555]">{request.term}</p>}
                 </div>
 
                 <div className="text-right">

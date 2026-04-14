@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Track } from '../lib/types'
+import { trackDurationSeconds } from '../lib/trackDuration'
 
 interface AudioPlayerState {
   currentTrack: Track | null
@@ -119,7 +120,7 @@ export function useAudioPlayer() {
         currentTrack: track,
         playing: false,
         progress: 0,
-        duration: track.duration || prev.duration,
+        duration: trackDurationSeconds(track) || prev.duration,
         queue: [track],
         queueIndex: 0,
       }))

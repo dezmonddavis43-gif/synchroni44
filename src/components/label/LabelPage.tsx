@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { Card, Spinner, EmptyState } from '../shared/UI'
 import { Music2, Users, Play, Pause, ArrowLeft, ChevronRight } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface LabelPageProps {
   profile: Profile
@@ -249,11 +250,9 @@ function ArtistProfile({ artist, onBack, onPlayTrack, currentTrack, playing }: A
                     </div>
                   </div>
 
-                  {track.duration && (
-                    <span className="text-sm text-[#555]">
-                      {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-                    </span>
-                  )}
+                  <span className="text-sm text-[#555]">
+                    {formatTrackDurationMmSs(track)}
+                  </span>
                 </div>
               </Card>
             ))}

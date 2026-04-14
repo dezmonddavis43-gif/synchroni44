@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Calendar, DollarSign, MoreHorizontal, X, Clock } from 'lucide-react'
-import { StatCard, Card, Btn, Input, Select, Spinner } from '../shared/UI'
+import { StatCard, Card, Btn, Input, Spinner } from '../shared/UI'
 import { PROJECT_STATUSES } from '../../lib/constants'
 import type { Profile, Project } from '../../lib/types'
 
@@ -10,7 +10,6 @@ interface ProjectsProps {
 }
 
 interface ProjectWithDetails extends Project {
-  music_type?: string
   owner_id?: string
   stage?: string
 }
@@ -36,8 +35,7 @@ export function Projects({ profile }: ProjectsProps) {
     name: '',
     client: '',
     budget: '',
-    deadline: '',
-    music_type: 'Song'
+    deadline: ''
   })
 
   useEffect(() => {
@@ -73,8 +71,7 @@ export function Projects({ profile }: ProjectsProps) {
           ...project,
           owner_id: userId,
           supervisor_id: userId,
-          status: project.stage === 'Finished' ? 'completed' : 'active',
-          music_type: project.stage
+          status: project.stage === 'Finished' ? 'completed' : 'active'
         }))
       )
       .select('*')
@@ -101,15 +98,14 @@ export function Projects({ profile }: ProjectsProps) {
         owner_id: userId,
         supervisor_id: userId,
         status: 'active',
-        stage: 'Briefed',
-        music_type: 'Briefed'
+        stage: 'Briefed'
       })
       .select()
       .single()
 
     if (!error && data) {
       setProjects([data, ...projects])
-      setNewProject({ name: '', client: '', budget: '', deadline: '', music_type: 'Song' })
+      setNewProject({ name: '', client: '', budget: '', deadline: '' })
       setShowNewProject(false)
     }
   }
@@ -123,8 +119,8 @@ export function Projects({ profile }: ProjectsProps) {
       'Ship Ready': 'active',
       'Finished': 'completed'
     }
-    await supabase.from('projects').update({ status: statusMap[newStatus], stage: newStatus, music_type: newStatus }).eq('id', projectId)
-    setProjects(projects.map(p => p.id === projectId ? { ...p, status: statusMap[newStatus] as Project['status'], stage: newStatus, music_type: newStatus } : p))
+    await supabase.from('projects').update({ status: statusMap[newStatus], stage: newStatus }).eq('id', projectId)
+    setProjects(projects.map(p => p.id === projectId ? { ...p, status: statusMap[newStatus] as Project['status'], stage: newStatus } : p))
   }
 
   const handleDragStart = (projectId: string) => {
@@ -145,7 +141,7 @@ export function Projects({ profile }: ProjectsProps) {
   }
 
   const getProjectsByStatus = (status: string) => {
-    return projects.filter(p => p.stage === status || p.music_type === status || (!p.stage && !p.music_type && status === 'Briefed'))
+    return projects.filter(p => p.stage === status || (!p.stage && status === 'Briefed'))
   }
 
   const getDaysUntilDeadline = (deadline: string) => {
@@ -298,15 +294,6 @@ export function Projects({ profile }: ProjectsProps) {
                   onChange={(e) => setNewProject({ ...newProject, deadline: e.target.value })}
                 />
               </div>
-              <Select
-                label="Music Type"
-                value={newProject.music_type}
-                onChange={(e) => setNewProject({ ...newProject, music_type: e.target.value })}
-              >
-                <option value="Song">Song</option>
-                <option value="Score">Score</option>
-                <option value="Library">Library</option>
-              </Select>
               <Btn onClick={createProject} className="w-full">Create Project</Btn>
             </div>
           </Card>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, Spinner, EmptyState, Btn, Input, Select } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState, Btn, Input, Select, Textarea } from '../shared/UI'
 import { ArtistLink } from '../shared/ArtistLink'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import {
@@ -8,6 +8,7 @@ import {
   RefreshCw, BarChart3, Upload, Globe
 } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface MyCatalogProps {
   profile: Profile
@@ -26,13 +27,6 @@ const STATUS_TABS: { id: StatusTab; label: string; color: string }[] = [
   { id: 'rejected', label: 'Rejected', color: '#FF4D4D' },
   { id: 'draft', label: 'Draft', color: '#666' }
 ]
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 function getMoodGradient(mood?: string): string {
   const color = mood ? MOOD_COLORS[mood] || '#C8A97E' : '#C8A97E'
@@ -129,10 +123,10 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
       artist: track.artist,
       mood: track.mood,
       genre: track.genre,
+      sub_genre: track.sub_genre,
       bpm: track.bpm,
-      key: track.key,
-      tags: track.tags,
-      one_stop_fee: track.one_stop_fee
+      key: track.musical_key ?? track.key,
+      notes: track.notes ?? track.ownership_notes
     })
   }
 
@@ -140,6 +134,8 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
     if (!editingTrack) return
     setSaving(true)
 
+    const keyTrim = editForm.key?.trim() || null
+    const notesTrim = editForm.notes?.trim() || null
     await supabase
       .from('tracks')
       .update({
@@ -147,14 +143,20 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
         artist: editForm.artist,
         mood: editForm.mood,
         genre: editForm.genre,
+        sub_genre: editForm.sub_genre?.trim() || null,
         bpm: editForm.bpm,
-        key: editForm.key,
-        tags: editForm.tags,
-        one_stop_fee: editForm.one_stop_fee
+        key: keyTrim,
+        musical_key: keyTrim,
+        notes: notesTrim,
+        ownership_notes: notesTrim
       })
       .eq('id', editingTrack.id)
 
-    setTracks(tracks.map(t => t.id === editingTrack.id ? { ...t, ...editForm } : t))
+    setTracks(tracks.map(t => {
+      if (t.id !== editingTrack.id) return t
+      const k = editForm.key?.trim() || undefined
+      return { ...t, ...editForm, key: k, musical_key: k, notes: notesTrim ?? undefined, ownership_notes: notesTrim ?? undefined }
+    }))
     setEditingTrack(null)
     setEditForm({})
     setSaving(false)
@@ -478,7 +480,7 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
                   ))}
                 </Select>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="BPM"
                   type="number"
@@ -490,17 +492,20 @@ export function MyCatalog({ profile, onPlayTrack, currentTrack, playing, onNavig
                   value={editForm.key || ''}
                   onChange={e => setEditForm({ ...editForm, key: e.target.value })}
                 />
-                <Input
-                  label="One-Stop Fee ($)"
-                  type="number"
-                  value={editForm.one_stop_fee || ''}
-                  onChange={e => setEditForm({ ...editForm, one_stop_fee: parseInt(e.target.value) || undefined })}
-                />
               </div>
               <Input
-                label="Tags (comma separated)"
-                value={editForm.tags?.join(', ') || ''}
-                onChange={e => setEditForm({ ...editForm, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                label="Sub-genre (optional)"
+                value={editForm.sub_genre || ''}
+                onChange={e => setEditForm({ ...editForm, sub_genre: e.target.value })}
+                placeholder="e.g. Dark pop"
+              />
+              <Textarea
+                label="Notes (optional)"
+                value={editForm.notes || ''}
+                onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                placeholder="Track notes"
+                rows={3}
+                className="bg-[#0D0D10] border border-[#2A2A2E] rounded-lg"
               />
             </div>
 
@@ -665,7 +670,7 @@ function TrackRow({ track, index, isPlaying, onPlay, onEdit, onDelete, onResubmi
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
 
       <div>{getStatusBadge(track.status)}</div>
 

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS } from '../../lib/constants'
 import { Play, Pause, Heart, Sparkles, Wand2, X, Filter, SlidersHorizontal } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface AISearchProps {
   profile: Profile
@@ -21,13 +22,6 @@ const EXAMPLE_QUERIES = [
   "Acoustic folk for a heartfelt documentary"
 ]
 
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
 export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISearchProps) {
   const [tracks, setTracks] = useState<Track[]>([])
   const [savedTracks, setSavedTracks] = useState<Set<string>>(new Set())
@@ -39,7 +33,6 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
   const [showFilters, setShowFilters] = useState(false)
   const [minBpm, setMinBpm] = useState('')
   const [maxBpm, setMaxBpm] = useState('')
-  const [clearanceFilter, setClearanceFilter] = useState('All')
 
   useEffect(() => {
     loadData()
@@ -111,11 +104,6 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
       if (minBpm && track.bpm && track.bpm < parseInt(minBpm)) return false
       if (maxBpm && track.bpm && track.bpm > parseInt(maxBpm)) return false
 
-      if (clearanceFilter !== 'All') {
-        const statusMap: Record<string, string> = { 'Cleared': 'CLEAR', 'PRO': 'PRO', 'Pending': 'PENDING' }
-        if (track.clearance_status !== statusMap[clearanceFilter]) return false
-      }
-
       return score > 0
     })
 
@@ -157,7 +145,6 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
     setHasSearched(false)
     setMinBpm('')
     setMaxBpm('')
-    setClearanceFilter('All')
   }
 
   if (loading) {
@@ -243,17 +230,6 @@ export function AISearch({ profile, onPlayTrack, currentTrack, playing }: AISear
                   className="w-16 bg-[#0A0A0C] border border-[#2A2A2E] rounded px-2 py-1 text-xs text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
                 />
               </div>
-              <div className="h-4 w-px bg-[#2A2A2E]" />
-              <select
-                value={clearanceFilter}
-                onChange={e => setClearanceFilter(e.target.value)}
-                className="bg-[#0A0A0C] border border-[#2A2A2E] rounded px-3 py-1 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E]"
-              >
-                <option value="All">All Clearance</option>
-                <option value="Cleared">Cleared</option>
-                <option value="PRO">PRO</option>
-                <option value="Pending">Pending</option>
-              </select>
             </div>
           )}
 
@@ -392,15 +368,7 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
       </div>
 
       <div className="w-16 text-right">
-        <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
-      </div>
-
-      <div className="hidden sm:block w-16">
-        {track.clearance_status ? (
-          <ClearanceBadge status={track.clearance_status} />
-        ) : (
-          <span className="text-sm text-[#555]">-</span>
-        )}
+        <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -412,9 +380,6 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         >
           <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
         </button>
-        <span className="text-sm text-[#C8A97E] font-medium w-14 text-right">
-          {track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}
-        </span>
       </div>
     </div>
   )

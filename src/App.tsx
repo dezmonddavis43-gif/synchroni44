@@ -215,7 +215,7 @@ function App() {
       case 'ai-match': return <AISearch profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
       case 'projects': return <Projects profile={previewProfile} />
       case 'playlists': return <PlaylistWorkspace profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
-      case 'studio': return <Studio profile={previewProfile} />
+      case 'studio': return <Studio profile={previewProfile} onNavigateToUpload={() => setActiveTab('upload')} />
       case 'hitlist': return <HitList profile={previewProfile} />
       case 'inbox': return <Inbox profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />
       case 'briefs': return <Briefs profile={previewProfile} onPlayTrack={handlePlayTrack} currentTrack={player.currentTrack} playing={player.playing} />

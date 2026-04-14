@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState, Btn, Input } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState, Btn, Input } from '../shared/UI'
 import { ArtistLink } from '../shared/ArtistLink'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import { Search, Play, Pause, Heart, ChevronRight, ChevronLeft, X, Send, UserPlus, Bookmark, Music2 } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 
 interface LabelCatalogProps {
   profile: Profile
@@ -24,28 +25,17 @@ interface FilterState {
   selectedMood: string
   selectedGenre: string
   bpmRange: [number, number]
-  clearanceFilter: string
-  rightsFilter: string
   sortBy: string
   keyFilter: string
 }
 
-const CLEARANCE_OPTIONS = ['All', 'Cleared', 'PRO', 'Pending']
-const RIGHTS_OPTIONS = ['All', 'Master', 'Sync', 'Both']
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
   { value: 'plays', label: 'Most Played' },
-  { value: 'fee', label: 'Highest Fee' },
+  { value: 'saves', label: 'Most Saved' },
   { value: 'alpha', label: 'Alphabetical' }
 ]
 const KEY_OPTIONS = ['All', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 function getMoodGradient(mood?: string): string {
   const color = mood ? MOOD_COLORS[mood] || '#C8A97E' : '#C8A97E'
@@ -62,8 +52,6 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
   const [selectedMood, setSelectedMood] = useState('All')
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
-  const [clearanceFilter, setClearanceFilter] = useState('All')
-  const [rightsFilter, setRightsFilter] = useState('All')
   const [sortBy, setSortBy] = useState('newest')
   const [keyFilter, setKeyFilter] = useState('All')
 
@@ -130,20 +118,14 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
       const matchesBpm = !track.bpm || (track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1])
       const matchesKey = keyFilter === 'All' || track.key?.startsWith(keyFilter)
 
-      let matchesClearance = true
-      if (clearanceFilter !== 'All') {
-        const statusMap: Record<string, string> = { 'Cleared': 'CLEAR', 'PRO': 'PRO', 'Pending': 'PENDING' }
-        matchesClearance = track.clearance_status === statusMap[clearanceFilter]
-      }
-
-      return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesClearance && matchesKey
+      return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesKey
     })
     .sort((a, b) => {
       switch (sortBy) {
         case 'plays':
           return (b.play_count || 0) - (a.play_count || 0)
-        case 'fee':
-          return (b.one_stop_fee || 0) - (a.one_stop_fee || 0)
+        case 'saves':
+          return (b.save_count || 0) - (a.save_count || 0)
         case 'alpha':
           return a.title.localeCompare(b.title)
         default:
@@ -167,16 +149,14 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
     setSelectedMood('All')
     setSelectedGenre('All')
     setBpmRange([60, 180])
-    setClearanceFilter('All')
-    setRightsFilter('All')
     setSortBy('newest')
     setKeyFilter('All')
     setRosterOnly(false)
   }
 
   const hasActiveFilters = searchQuery || selectedMood !== 'All' || selectedGenre !== 'All' ||
-    bpmRange[0] !== 60 || bpmRange[1] !== 180 || clearanceFilter !== 'All' ||
-    rightsFilter !== 'All' || sortBy !== 'newest' || keyFilter !== 'All' || rosterOnly
+    bpmRange[0] !== 60 || bpmRange[1] !== 180 ||
+    sortBy !== 'newest' || keyFilter !== 'All' || rosterOnly
 
   const saveCurrentSearch = () => {
     if (!newSearchName.trim()) return
@@ -188,8 +168,6 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
         selectedMood,
         selectedGenre,
         bpmRange,
-        clearanceFilter,
-        rightsFilter,
         sortBy,
         keyFilter
       }
@@ -204,8 +182,6 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
     setSelectedMood(search.filters.selectedMood)
     setSelectedGenre(search.filters.selectedGenre)
     setBpmRange(search.filters.bpmRange)
-    setClearanceFilter(search.filters.clearanceFilter)
-    setRightsFilter(search.filters.rightsFilter)
     setSortBy(search.filters.sortBy)
     setKeyFilter(search.filters.keyFilter)
   }
@@ -358,26 +334,6 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
           </select>
 
           <select
-            value={clearanceFilter}
-            onChange={e => setClearanceFilter(e.target.value)}
-            className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-4 py-2 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
-          >
-            {CLEARANCE_OPTIONS.map(option => (
-              <option key={option} value={option}>{option === 'All' ? 'All Clearance' : option}</option>
-            ))}
-          </select>
-
-          <select
-            value={rightsFilter}
-            onChange={e => setRightsFilter(e.target.value)}
-            className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-4 py-2 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
-          >
-            {RIGHTS_OPTIONS.map(option => (
-              <option key={option} value={option}>{option === 'All' ? 'All Rights' : option}</option>
-            ))}
-          </select>
-
-          <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
             className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-4 py-2 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
@@ -481,15 +437,14 @@ export function LabelCatalog({ profile, onPlayTrack, currentTrack, playing }: La
 
           {filteredTracks.length > 0 ? (
             <div className="rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_80px_140px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
+              <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_140px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
                 <span>#</span>
                 <span>Title</span>
                 <span>Genre</span>
                 <span>BPM</span>
                 <span>Mood</span>
                 <span>Duration</span>
-                <span>Status</span>
-                <span className="text-right">Fee</span>
+                <span>Catalog</span>
                 <span className="text-right">Actions</span>
               </div>
               {filteredTracks.map((track, index) => (
@@ -713,7 +668,7 @@ function TrackRow({ track, index, isPlaying, isSaved, isOnRoster, onPlay, onTogg
 
   return (
     <div
-      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_80px_140px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
+      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_80px_140px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
         hovered ? 'bg-[#1A1A1E]' : index % 2 === 0 ? 'bg-[#0D0D10]' : 'bg-transparent'
       } ${isPlaying ? 'bg-[#C8A97E]/10' : ''}`}
       onMouseEnter={() => setHovered(true)}
@@ -764,19 +719,9 @@ function TrackRow({ track, index, isPlaying, isSaved, isOnRoster, onPlay, onTogg
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
 
-      <div>
-        {track.clearance_status ? (
-          <ClearanceBadge status={track.clearance_status} />
-        ) : (
-          <span className="text-sm text-[#555]">-</span>
-        )}
-      </div>
-
-      <span className="text-sm text-[#C8A97E] font-medium text-right">
-        {track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}
-      </span>
+      <span className="text-sm text-[#888] capitalize">{track.status || '-'}</span>
 
       <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
         <button

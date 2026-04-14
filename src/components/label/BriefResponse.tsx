@@ -369,9 +369,7 @@ export function BriefResponse({
                   </h3>
                   <p className="text-sm text-[#E8E8E8] mb-2">{brief.usage_terms}</p>
                   <div className="flex flex-wrap gap-2 text-xs text-[#888]">
-                    {brief.territory && <span>Territory: {brief.territory}</span>}
                     {brief.term_length && <span>- Term: {brief.term_length}</span>}
-                    {brief.usage_type && <span>- Type: {brief.usage_type}</span>}
                     {brief.exclusivity && (
                       <span className="flex items-center gap-1 text-[#C8A97E]">
                         <Shield className="w-3 h-3" /> Exclusive

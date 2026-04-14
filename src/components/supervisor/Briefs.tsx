@@ -47,7 +47,6 @@ export function Briefs({ profile }: BriefsProps) {
     client: '',
     client_name: '',
     project_name: '',
-    usage_type: '',
     media_type: '',
     sonic_direction: '',
     reference_tracks: '',
@@ -56,7 +55,6 @@ export function Briefs({ profile }: BriefsProps) {
     usage_terms: '',
     rights_needed: '',
     term_length: '',
-    territory: '',
     deadline: '',
     is_private: false,
     status: 'draft',
@@ -102,8 +100,11 @@ export function Briefs({ profile }: BriefsProps) {
   const saveBrief = async () => {
     if (!briefForm.title) return
 
+    const { usage_type: _usage, territory: _territory, ...briefRest } = briefForm as Partial<Brief> & { usage_type?: string; territory?: string }
+    void _usage
+    void _territory
     const payload = {
-      ...briefForm,
+      ...briefRest,
       created_by: profile.id,
       supervisor_id: profile.id
     }
@@ -141,7 +142,6 @@ export function Briefs({ profile }: BriefsProps) {
       client: '',
       client_name: '',
       project_name: '',
-      usage_type: '',
       media_type: '',
       sonic_direction: '',
       reference_tracks: '',
@@ -150,7 +150,6 @@ export function Briefs({ profile }: BriefsProps) {
       usage_terms: '',
       rights_needed: '',
       term_length: '',
-      territory: '',
       deadline: '',
       is_private: false,
       status: 'draft',
@@ -208,7 +207,6 @@ export function Briefs({ profile }: BriefsProps) {
             <Input label="Brand / Client" value={briefForm.client || ''} onChange={e => setBriefForm({ ...briefForm, client: e.target.value })} />
             <Input label="Client Name" value={briefForm.client_name || ''} onChange={e => setBriefForm({ ...briefForm, client_name: e.target.value })} />
             <Input label="Project Name" value={briefForm.project_name || ''} onChange={e => setBriefForm({ ...briefForm, project_name: e.target.value })} />
-            <Input label="Project / Usage Type" value={briefForm.usage_type || ''} onChange={e => setBriefForm({ ...briefForm, usage_type: e.target.value })} />
             <Input label="Scene / Sonic Direction" value={briefForm.scene_type || ''} onChange={e => setBriefForm({ ...briefForm, scene_type: e.target.value })} />
             <Input label="Sonic Direction Notes" value={briefForm.sonic_direction || ''} onChange={e => setBriefForm({ ...briefForm, sonic_direction: e.target.value })} />
             <Input label="Media Type" value={briefForm.media_type || ''} onChange={e => setBriefForm({ ...briefForm, media_type: e.target.value })} />
@@ -227,7 +225,6 @@ export function Briefs({ profile }: BriefsProps) {
               value={(briefForm.reference_links || []).join(', ')}
               onChange={e => setBriefForm({ ...briefForm, reference_links: e.target.value.split(',').map(link => link.trim()).filter(Boolean) })}
             />
-            <Input label="Territory" value={briefForm.territory || ''} onChange={e => setBriefForm({ ...briefForm, territory: e.target.value })} />
             <Input label="Term" value={briefForm.term_length || ''} onChange={e => setBriefForm({ ...briefForm, term_length: e.target.value })} />
             <Input label="Rights Needed" value={briefForm.usage_terms || ''} onChange={e => setBriefForm({ ...briefForm, usage_terms: e.target.value })} />
             <Input label="Budget" type="number" value={briefForm.budget || ''} onChange={e => setBriefForm({ ...briefForm, budget: parseInt(e.target.value) || 0 })} />

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS } from '../../lib/constants'
 import { Plus, Play, Pause, ListMusic, Share2, Trash2, GripVertical, X, ChevronRight, ChevronDown, MoreHorizontal, Star, Tag, Search, FolderPlus, CreditCard as Edit3, Copy, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import type { Profile, Playlist, PlaylistTrack, Track, Project } from '../../lib/types'
+import { formatTrackDurationMmSs, formatSecondsAsMmSs, trackDurationSeconds } from '../../lib/trackDuration'
 
 interface PlaylistsProps {
   profile: Profile
@@ -378,13 +379,7 @@ export function Playlists({ profile, onPlayTrack, currentTrack, playing }: Playl
     return matchesSearch && matchesMood
   })
 
-  const totalDuration = playlistTracks.reduce((sum, pt) => sum + (pt.track?.duration || 0), 0)
-  const formatTotalDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const hrs = Math.floor(mins / 60)
-    if (hrs > 0) return `${hrs}h ${mins % 60}m`
-    return `${mins}m`
-  }
+  const totalDuration = playlistTracks.reduce((sum, pt) => sum + trackDurationSeconds(pt.track), 0)
 
   if (loading) {
     return (
@@ -560,7 +555,7 @@ export function Playlists({ profile, onPlayTrack, currentTrack, playing }: Playl
                   {playlistTracks.length} tracks
                 </span>
                 <span className="text-sm text-[#555]">
-                  {formatTotalDuration(totalDuration)}
+                  {formatSecondsAsMmSs(totalDuration)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -957,15 +952,10 @@ function TrackRow({
       <span className="text-xs text-[#666] w-16 hidden lg:block">{track.genre || '-'}</span>
       <span className="text-xs text-[#666] w-12 hidden lg:block">{track.bpm || '-'}</span>
       <span className="text-xs text-[#666] w-12 hidden lg:block">
-        {track.duration ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, '0')}` : '-'}
+        {formatTrackDurationMmSs(track)}
       </span>
 
       {track.mood && <MoodPill mood={track.mood} />}
-      {track.clearance_status && <ClearanceBadge status={track.clearance_status} />}
-
-      <span className="text-xs text-[#C8A97E] font-medium w-16 text-right hidden lg:block">
-        {track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}
-      </span>
 
       <div className={`flex items-center gap-1 transition-opacity ${hovered ? 'opacity-100' : 'opacity-0'}`}>
         <button className="p-1.5 text-[#666] hover:text-[#C8A97E] transition-colors">

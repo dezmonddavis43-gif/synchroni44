@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Pitch, Profile, Track } from '../../lib/types'
 
@@ -72,21 +72,22 @@ export function PitchTracker({ profile }: PitchTrackerProps) {
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ track_id: '', supervisor_name: '', project_name: '', fee_offered: 0, notes: '' })
 
-  useEffect(() => {
-    const load = async () => {
-      const pitchQuery = profile.role === 'artist'
-        ? supabase.from('brief_submissions').select('id,track_id,created_at,status,notes,brief:briefs(title),track:tracks(*)').eq('artist_id', profile.id)
-        : supabase.from('pitches').select('*, track:tracks(*)').eq('label_id', profile.id)
-      const [pRes, tRes] = await Promise.all([pitchQuery, supabase.from('tracks').select('*').eq('status', 'active').limit(100)])
+  const loadData = useCallback(async () => {
+    const pitchQuery = profile.role === 'artist'
+      ? supabase.from('brief_submissions').select('id,track_id,created_at,status,notes,brief:briefs(title),track:tracks(*)').eq('artist_id', profile.id)
+      : supabase.from('pitches').select('*, track:tracks(*)').eq('label_id', profile.id)
+    const [pRes, tRes] = await Promise.all([pitchQuery, supabase.from('tracks').select('*').eq('status', 'active').limit(100)])
 
-      const pitchRows = (pRes.data ?? []) as PitchBoardRow[]
-      setPitches(pitchRows.length > 0 ? pitchRows : seedPitches)
+    const pitchRows = (pRes.data ?? []) as PitchBoardRow[]
+    setPitches(pitchRows.length > 0 ? pitchRows : seedPitches)
 
-      const trackRows = (tRes.data ?? []) as Track[]
-      setTracks(trackRows.length > 0 ? trackRows : seedPitches.map(p => p.track).filter((t): t is Track => Boolean(t)))
-    }
-    void load()
+    const trackRows = (tRes.data ?? []) as Track[]
+    setTracks(trackRows.length > 0 ? trackRows : seedPitches.map(p => p.track).filter((t): t is Track => Boolean(t)))
   }, [profile.id, profile.role])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const stats = useMemo(() => {
     const total = pitches.length

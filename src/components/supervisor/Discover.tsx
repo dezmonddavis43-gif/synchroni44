@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import { Search, Play, Pause, Heart, ChevronRight, ChevronLeft, X, ListPlus } from 'lucide-react'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 import { ArtistLink } from '../shared/ArtistLink'
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -42,15 +43,6 @@ const MOOD_PLAYLISTS = [
   { name: 'Intense', moods: ['Tense', 'Aggressive', 'Suspenseful'], icon: '...', count: 0 }
 ]
 
-const CLEARANCE_OPTIONS = ['All', 'Cleared', 'PRO', 'Pending']
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
 function getMoodGradient(mood?: string): string {
   const color = mood ? MOOD_COLORS[mood] || '#C8A97E' : '#C8A97E'
   return `linear-gradient(135deg, ${color}99 0%, #0A0A0C 100%)`
@@ -70,7 +62,6 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
   const [selectedMood, setSelectedMood] = useState('All')
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
-  const [clearanceFilter, setClearanceFilter] = useState('All')
   const [activeTab, setActiveTab] = useState<'browse' | 'moods'>('browse')
   const [selectedMoodPlaylist, setSelectedMoodPlaylist] = useState<string | null>(null)
   const [swipedTrackId, setSwipedTrackId] = useState<string | null>(null)
@@ -173,12 +164,6 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
     const matchesGenre = selectedGenre === 'All' || track.genre === selectedGenre
     const matchesBpm = !track.bpm || (track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1])
 
-    let matchesClearance = true
-    if (clearanceFilter !== 'All') {
-      const statusMap: Record<string, string> = { 'Cleared': 'CLEAR', 'PRO': 'PRO', 'Pending': 'PENDING' }
-      matchesClearance = track.clearance_status === statusMap[clearanceFilter]
-    }
-
     let matchesMoodPlaylist = true
     if (selectedMoodPlaylist) {
       const playlist = MOOD_PLAYLISTS.find(p => p.name === selectedMoodPlaylist)
@@ -187,8 +172,8 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
       }
     }
 
-    return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesClearance && matchesMoodPlaylist
-  }), [tracks, debouncedSearchQuery, selectedMood, selectedGenre, bpmRange, clearanceFilter, selectedMoodPlaylist])
+    return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesMoodPlaylist
+  }), [tracks, debouncedSearchQuery, selectedMood, selectedGenre, bpmRange, selectedMoodPlaylist])
 
   const [featuredTracks, setFeaturedTracks] = useState<Track[]>([])
   const [featuredTracksLoading, setFeaturedTracksLoading] = useState(true)
@@ -230,12 +215,11 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
     setSelectedMood('All')
     setSelectedGenre('All')
     setBpmRange([60, 180])
-    setClearanceFilter('All')
     setSelectedMoodPlaylist(null)
   }
 
   const hasActiveFilters = searchInput || selectedMood !== 'All' || selectedGenre !== 'All' ||
-    bpmRange[0] !== 60 || bpmRange[1] !== 180 || clearanceFilter !== 'All' || selectedMoodPlaylist
+    bpmRange[0] !== 60 || bpmRange[1] !== 180 || selectedMoodPlaylist
 
   if (loading) {
     return (
@@ -350,16 +334,6 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
               className="w-16 h-1 bg-[#333] rounded-full appearance-none cursor-pointer accent-[#C8A97E]"
             />
           </div>
-
-          <select
-            value={clearanceFilter}
-            onChange={e => setClearanceFilter(e.target.value)}
-            className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-4 py-2 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0 hidden md:block"
-          >
-            {CLEARANCE_OPTIONS.map(option => (
-              <option key={option} value={option}>{option === 'All' ? 'All Clearance' : option}</option>
-            ))}
-          </select>
 
           {hasActiveFilters && (
             <button
@@ -527,15 +501,14 @@ export function Discover({ profile, onPlayTrack, currentTrack, playing, searchQu
               {filteredTracks.length > 0 ? (
                 <>
                   <div className="rounded-xl overflow-hidden hidden md:block">
-                    <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_80px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
+                    <div className="grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_40px] gap-4 px-4 py-3 text-xs text-[#666] uppercase tracking-wider border-b border-[#1A1A1E]">
                       <span>#</span>
                       <span>Title</span>
                       <span>Genre</span>
                       <span>BPM</span>
                       <span>Mood</span>
                       <span>Duration</span>
-                      <span>Status</span>
-                      <span className="text-right">Fee</span>
+                      <span />
                     </div>
                     {filteredTracks.map((track, index) => (
                       <TrackRow
@@ -699,7 +672,7 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
 
   return (
     <div
-      className={`grid grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_60px_80px] gap-4 px-4 py-3 items-center cursor-pointer transition-colors ${
+      className={`grid grid-cols-[36px_minmax(0,1fr)_52px_40px] md:grid-cols-[40px_minmax(200px,2fr)_1fr_80px_100px_80px_40px] gap-2 md:gap-4 px-3 md:px-4 py-3 items-center cursor-pointer transition-colors ${
         hovered ? 'bg-[#1A1A1E]' : index % 2 === 0 ? 'bg-[#0D0D10]' : 'bg-transparent'
       } ${isPlaying ? 'bg-[#C8A97E]/10' : ''}`}
       onMouseEnter={() => setHovered(true)}
@@ -735,25 +708,17 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         </div>
       </div>
 
-      <span className="text-sm text-[#888] truncate">{track.genre || '-'}</span>
+      <span className="hidden md:block text-sm text-[#888] truncate">{track.genre || '-'}</span>
 
-      <span className="text-sm text-[#888]">{track.bpm || '-'}</span>
+      <span className="hidden md:block text-sm text-[#888]">{track.bpm || '-'}</span>
 
-      <div>
+      <div className="hidden md:block">
         {track.mood ? <MoodPill mood={track.mood} /> : <span className="text-sm text-[#555]">-</span>}
       </div>
 
-      <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888] tabular-nums">{formatTrackDurationMmSs(track)}</span>
 
-      <div>
-        {track.clearance_status ? (
-          <ClearanceBadge status={track.clearance_status} />
-        ) : (
-          <span className="text-sm text-[#555]">-</span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end">
         <button
           onClick={onToggleSave}
           className={`p-1.5 rounded-full transition-colors ${
@@ -762,9 +727,6 @@ function TrackRow({ track, index, isPlaying, isSaved, onPlay, onToggleSave }: Tr
         >
           <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
         </button>
-        <span className="text-sm text-[#C8A97E] font-medium">
-          {track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}
-        </span>
       </div>
     </div>
   )

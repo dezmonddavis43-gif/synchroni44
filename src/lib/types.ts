@@ -31,6 +31,7 @@ export interface Track {
   producers?: string[]
   mood?: string
   genre?: string
+  sub_genre?: string
   bpm?: number
   key?: string
   musical_key?: string
@@ -44,7 +45,10 @@ export interface Track {
   stems_urls?: string[]
   clearance_status?: 'CLEAR' | 'PRO' | 'PENDING'
   status?: 'active' | 'review' | 'rejected' | 'draft'
+  /** @deprecated Prefer duration_ms; kept for older rows (seconds). */
   duration?: number
+  /** Audio length in ms (set on upload via Web Audio decode). */
+  duration_ms?: number
   lyrics?: string
   themes?: string[]
   tags?: string[]
@@ -53,6 +57,8 @@ export interface Track {
   explicit?: boolean
   clean_version?: boolean
   ownership_notes?: string
+  /** Track notes (preferred). Legacy rows may only have ownership_notes. */
+  notes?: string
   master_split?: number
   publishing_split?: number
   uploaded_by: string

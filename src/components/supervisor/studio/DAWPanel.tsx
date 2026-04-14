@@ -99,7 +99,10 @@ export function DAWPanel({
       const res = await fetch(url)
       const buf = await res.arrayBuffer()
       return await ctx.decodeAudioData(buf)
-    } catch { return null }
+    } catch (err) {
+      console.debug('[DAW] decode from url failed', err)
+      return null
+    }
   }, [getAudioCtx])
 
   const loadAudioFromFile = useCallback(async (file: File): Promise<AudioBuffer | null> => {
@@ -107,7 +110,10 @@ export function DAWPanel({
       const ctx = getAudioCtx()
       const buf = await file.arrayBuffer()
       return await ctx.decodeAudioData(buf)
-    } catch { return null }
+    } catch (err) {
+      console.debug('[DAW] decode from file failed', err)
+      return null
+    }
   }, [getAudioCtx])
 
   const tracksBufferKey = tracks.map(t => `${t.id}:${t.audioBuffer ? '1' : '0'}`).join(',')
@@ -131,7 +137,7 @@ export function DAWPanel({
       try {
         src.stop()
       } catch {
-        void 0
+        /* already stopped */
       }
     })
     sourceRefs.current.clear()
@@ -228,7 +234,7 @@ export function DAWPanel({
     try {
       sourceRefs.current.get(trackId)?.stop()
     } catch {
-      void 0
+      /* source may already be stopped */
     }
 
     const gain = ctx.createGain()
@@ -259,7 +265,7 @@ export function DAWPanel({
     try {
       sourceRefs.current.get(id)?.stop()
     } catch {
-      void 0
+      /* source may already be stopped */
     }
     sourceRefs.current.delete(id)
     gainRefs.current.delete(id)

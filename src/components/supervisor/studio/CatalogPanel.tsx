@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, GripVertical, Sparkles, Info } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import type { Track } from '../../../lib/types'
+import { formatTrackDurationMmSs } from '../../../lib/trackDuration'
 import { MOOD_COLORS } from './types'
 
 const MOODS = ['All', 'Tense', 'Hopeful', 'Melancholic', 'Sensual', 'Aggressive', 'Peaceful']
@@ -11,13 +12,6 @@ type CatalogTab = 'catalog' | 'ai' | 'detail'
 interface CatalogPanelProps {
   onAddTrack: (track: Track) => void
   selectedTrack?: Track | null
-}
-
-function formatDuration(s?: number | null) {
-  if (!s) return '--'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${String(sec).padStart(2, '0')}`
 }
 
 function TrackRow({ track, onAdd }: { track: Track; onAdd: () => void }) {
@@ -60,7 +54,7 @@ function TrackRow({ track, onAdd }: { track: Track; onAdd: () => void }) {
           </span>
         ) : <span className="text-[#333] text-[9px]">–</span>}
       </td>
-      <td className="px-1.5 py-1 text-[9px] text-[#444]">{formatDuration(track.duration)}</td>
+      <td className="px-1.5 py-1 text-[9px] text-[#444]">{formatTrackDurationMmSs(track)}</td>
       <td className="px-1 py-1">
         <button
           onClick={onAdd}
@@ -331,11 +325,12 @@ export function CatalogPanel({ onAddTrack, selectedTrack }: CatalogPanelProps) {
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 {[
                   ['Genre', selectedTrack.genre],
+                  ['Sub-genre', selectedTrack.sub_genre],
                   ['BPM', selectedTrack.bpm != null ? String(selectedTrack.bpm) : ''],
                   ['Key', selectedTrack.key ?? selectedTrack.musical_key ?? ''],
                   ['Mood', selectedTrack.mood],
-                  ['Duration', formatDuration(selectedTrack.duration)],
-                  ['Clearance', selectedTrack.clearance_status ?? ''],
+                  ['Duration', formatTrackDurationMmSs(selectedTrack)],
+                  ['Status', selectedTrack.status ?? ''],
                 ].map(([label, value]) => value && (
                   <div key={label as string} className="bg-[#131318] rounded p-2">
                     <p className="text-[#555] text-[9px] uppercase tracking-wider mb-0.5">{label}</p>

@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { supabase } from '../../lib/supabase'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState } from './UI'
+import { MoodPill, Spinner, EmptyState } from './UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import {
   Plus, Play, Pause, Heart, GripVertical, X, ChevronDown, MoreHorizontal, Search,
   FolderPlus, Share2, Trash2, Copy, ListMusic, ArrowUp, Check
 } from 'lucide-react'
 import type { Profile, Playlist, PlaylistTrack, Track, Project } from '../../lib/types'
+import { formatTrackDurationMmSs, formatSecondsAsMmSs, trackDurationSeconds } from '../../lib/trackDuration'
 import { ArtistLink } from './ArtistLink'
 
 declare global {
@@ -32,22 +34,6 @@ interface PlaylistTrackWithFolder extends PlaylistTrack {
   folder_name?: string
 }
 
-const CLEARANCE_OPTIONS = ['All', 'Cleared', 'PRO', 'Pending']
-
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-function formatTotalDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const hrs = Math.floor(mins / 60)
-  if (hrs > 0) return `${hrs}h ${mins % 60}m`
-  return `${mins}m`
-}
-
 export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing }: PlaylistWorkspaceProps) {
   const [columns, setColumns] = useState<PlaylistColumn[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -60,7 +46,6 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
   const [selectedMood, setSelectedMood] = useState('All')
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
-  const [clearanceFilter, setClearanceFilter] = useState('All')
 
   const [showNewPlaylist, setShowNewPlaylist] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
@@ -74,7 +59,6 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
 
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null)
   const [dragOverAddButton, setDragOverAddButton] = useState(false)
-  const [draggedTrack, setDraggedTrack] = useState<Track | null>(null)
 
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -85,6 +69,8 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
 
   const containerRef = useRef<HTMLDivElement>(null)
   const columnsScrollRef = useRef<HTMLDivElement>(null)
+  const columnsRef = useRef<PlaylistColumn[]>([])
+  const catalogTracksRef = useRef<Track[]>([])
 
   useEffect(() => {
     loadData()
@@ -124,7 +110,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
         const raw = (playlist as unknown as { playlist_tracks?: PlaylistTrackWithFolder[] }).playlist_tracks || []
         const tracks = [...raw].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
         const project = projectsRes.data?.find(p => p.id === playlist.project_id)
-        const totalDuration = tracks.reduce((sum, pt) => sum + (pt.track?.duration || 0), 0)
+        const totalDuration = tracks.reduce((sum, pt) => sum + trackDurationSeconds(pt.track), 0)
         return {
           ...playlist,
           tracks,
@@ -166,13 +152,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     const matchesGenre = selectedGenre === 'All' || track.genre === selectedGenre
     const matchesBpm = !track.bpm || (track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1])
 
-    let matchesClearance = true
-    if (clearanceFilter !== 'All') {
-      const statusMap: Record<string, string> = { 'Cleared': 'CLEAR', 'PRO': 'PRO', 'Pending': 'PENDING' }
-      matchesClearance = track.clearance_status === statusMap[clearanceFilter]
-    }
-
-    return matchesSearch && matchesMood && matchesGenre && matchesBpm && matchesClearance
+    return matchesSearch && matchesMood && matchesGenre && matchesBpm
   })
 
   const createPlaylist = async (initialTrack?: Track) => {
@@ -204,7 +184,10 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
         totalDuration: 0,
         project
       }
-      setColumns(prev => [...prev, newColumn])
+      // So addTrackToPlaylist (e.g. drag-to-create) sees the new column in columnsRef on the next line.
+      flushSync(() => {
+        setColumns(prev => [...prev, newColumn])
+      })
       setNewPlaylistName('')
       setNewPlaylistProject('')
       setShowNewPlaylist(false)
@@ -298,47 +281,76 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
   }
 
   const addTrackToPlaylist = async (playlistId: string, track: Track) => {
-    const targetColumn = columns.find(c => c.id === playlistId)
-    if (!targetColumn) return
-    const { data: authData } = await supabase.auth.getUser()
-    const userId = authData.user?.id ?? profile.id
+    const targetColumn = columnsRef.current.find(c => c.id === playlistId)
+    let position = targetColumn?.tracks.length ?? 0
+    if (!targetColumn) {
+      const { count, error: countError } = await supabase
+        .from('playlist_tracks')
+        .select('*', { count: 'exact', head: true })
+        .eq('playlist_id', playlistId)
+      if (countError) {
+        console.error('playlist_tracks count failed:', countError)
+        window.alert('Playlist not found. Try refreshing the page.')
+        return
+      }
+      position = count ?? 0
+    }
 
-    const { error } = await supabase
+    // Omit added_by — avoids FK edge cases; RLS only checks playlist ownership.
+    // Avoid nested track:tracks() embed — can make .select() fail under some RLS/embed combinations.
+    const { data: inserted, error } = await supabase
       .from('playlist_tracks')
       .insert({
         playlist_id: playlistId,
         track_id: track.id,
-        added_by: userId,
-        position: targetColumn.tracks.length,
+        position,
         folder_name: null
       })
+      .select('id, playlist_id, track_id, position, folder_name, notes')
+      .maybeSingle()
 
     if (error) {
-      console.error('Insert failed:', error)
+      console.error('playlist_tracks insert failed:', error)
+      window.alert(`Could not add track to playlist: ${error.message}`)
       return
     }
 
-    const { data: newTrackData } = await supabase
-      .from('playlist_tracks')
-      .select('*, track:tracks(*)')
-      .eq('playlist_id', playlistId)
-      .eq('track_id', track.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (newTrackData) {
-      setColumns(columns.map(c => {
-        if (c.id === playlistId) {
-          return {
-            ...c,
-            tracks: [...c.tracks, newTrackData as PlaylistTrackWithFolder],
-            totalDuration: c.totalDuration + (track.duration || 0)
-          }
-        }
-        return c
-      }))
+    let base = inserted as PlaylistTrackWithFolder | null
+    if (!base) {
+      const { data: fetched } = await supabase
+        .from('playlist_tracks')
+        .select('id, playlist_id, track_id, position, folder_name, notes')
+        .eq('playlist_id', playlistId)
+        .eq('track_id', track.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      base = fetched as PlaylistTrackWithFolder | null
     }
+
+    if (!base) {
+      window.alert('Could not confirm the track was added. Refresh the page to see your playlists.')
+      return
+    }
+
+    const resolved: PlaylistTrackWithFolder = { ...base, track }
+
+    setColumns(prev => {
+      const idx = prev.findIndex(c => c.id === playlistId)
+      if (idx === -1) {
+        console.warn('addTrackToPlaylist: playlist not in local state after insert; UI may be stale until refresh')
+        return prev
+      }
+      return prev.map(c => {
+        if (c.id !== playlistId) return c
+        const dur = trackDurationSeconds(track)
+        return {
+          ...c,
+          tracks: [...c.tracks, resolved],
+          totalDuration: c.totalDuration + dur
+        }
+      })
+    })
   }
 
   const removeTrackFromPlaylist = async (playlistId: string, trackId: string, duration: number) => {
@@ -424,11 +436,13 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
     setSelectedMood('All')
     setSelectedGenre('All')
     setBpmRange([60, 180])
-    setClearanceFilter('All')
   }
 
   const hasActiveFilters = searchQuery || selectedMood !== 'All' || selectedGenre !== 'All' ||
-    bpmRange[0] !== 60 || bpmRange[1] !== 180 || clearanceFilter !== 'All'
+    bpmRange[0] !== 60 || bpmRange[1] !== 180
+
+  columnsRef.current = columns
+  catalogTracksRef.current = catalogTracks
 
   if (loading) {
     return (
@@ -444,7 +458,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
   }
 
   return (
-    <div ref={containerRef} className="h-[calc(100vh-76px)] flex flex-col bg-[#0A0A0C]" style={{ userSelect: 'none' }}>
+    <div ref={containerRef} className="h-[calc(100vh-76px)] flex flex-col bg-[#0A0A0C]">
       <div style={{ height: `${splitRatio}%` }} className="flex flex-col min-h-[200px]">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1A1A1E] flex-shrink-0">
           <h2 className="font-['Playfair_Display'] text-lg text-white">Playlists</h2>
@@ -471,6 +485,10 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.stopPropagation()
                   setDragOverColumnId(column.id)
                 }}
+                onDragOverCapture={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'copy'
+                }}
                 onDragOver={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -492,20 +510,30 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.preventDefault()
                   e.stopPropagation()
                   setDragOverColumnId(null)
-                  const id = e.dataTransfer.getData('text/plain')
-                  let trackData: Track | null = draggedTrack || window.__draggedTrack || null
-                  if (id && (!trackData || trackData.id !== id)) {
-                    trackData = catalogTracks.find(t => t.id === id) || null
+                  const id =
+                    e.dataTransfer.getData('text/plain')?.trim() ||
+                    e.dataTransfer.getData('application/x-synchroni-track-id')?.trim()
+                  let trackData: Track | null = null
+                  if (id) {
+                    trackData = catalogTracksRef.current.find(t => t.id === id) ?? null
                   }
                   if (!trackData) {
                     try {
-                      trackData = JSON.parse(e.dataTransfer.getData('application/json')) as Track
+                      const raw = e.dataTransfer.getData('application/json')
+                      if (raw) trackData = JSON.parse(raw) as Track
                     } catch {
                       trackData = null
                     }
                   }
-                  if (trackData) await addTrackToPlaylist(column.id, trackData)
-                  setDraggedTrack(null)
+                  if (!trackData) {
+                    trackData = window.__draggedTrack ?? null
+                  }
+                  if (!trackData?.id) {
+                    window.alert('Could not read the dragged track. Try using the + button on the row to add to a playlist.')
+                    window.__draggedTrack = undefined
+                    return
+                  }
+                  await addTrackToPlaylist(column.id, trackData)
                   window.__draggedTrack = undefined
                 }}
               >
@@ -548,11 +576,18 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   <div className="flex items-center gap-2 mt-2 text-xs text-[#666]">
                     <span>{column.tracks.length} tracks</span>
                     <span className="text-[#333]">|</span>
-                    <span>{formatTotalDuration(column.totalDuration)}</span>
+                    <span>{formatSecondsAsMmSs(column.totalDuration)}</span>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-2">
+                <div
+                  className="flex-1 overflow-y-auto p-2 min-h-[120px]"
+                  onDragOver={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    e.dataTransfer.dropEffect = 'copy'
+                  }}
+                >
                   {uncategorized.length > 0 && (
                     <div className="space-y-1 mb-3">
                       {uncategorized.map((pt, index) => (
@@ -563,7 +598,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                           isPlaying={currentTrack?.id === pt.track_id && playing}
                           isCurrentTrack={currentTrack?.id === pt.track_id}
                           onPlay={() => pt.track && onPlayTrack(pt.track)}
-                          onRemove={() => removeTrackFromPlaylist(column.id, pt.id, pt.track?.duration || 0)}
+                          onRemove={() => removeTrackFromPlaylist(column.id, pt.id, trackDurationSeconds(pt.track))}
                         />
                       ))}
                     </div>
@@ -601,7 +636,7 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                                 isPlaying={currentTrack?.id === pt.track_id && playing}
                                 isCurrentTrack={currentTrack?.id === pt.track_id}
                                 onPlay={() => pt.track && onPlayTrack(pt.track)}
-                                onRemove={() => removeTrackFromPlaylist(column.id, pt.id, pt.track?.duration || 0)}
+                                onRemove={() => removeTrackFromPlaylist(column.id, pt.id, trackDurationSeconds(pt.track))}
                               />
                             ))}
                           </div>
@@ -611,9 +646,16 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   })}
 
                   {column.tracks.length === 0 && (
-                    <div className={`flex flex-col items-center justify-center py-8 rounded-lg border-2 border-dashed transition-colors ${
-                      isDragOver ? 'border-[#C8A97E] bg-[#C8A97E]/5' : 'border-[#2A2A2E]'
-                    }`}>
+                    <div
+                      className={`flex flex-col items-center justify-center py-8 rounded-lg border-2 border-dashed transition-colors ${
+                        isDragOver ? 'border-[#C8A97E] bg-[#C8A97E]/5' : 'border-[#2A2A2E]'
+                      }`}
+                      onDragOver={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        e.dataTransfer.dropEffect = 'copy'
+                      }}
+                    >
                       <ListMusic className="w-6 h-6 text-[#333] mb-2" />
                       <p className="text-xs text-[#555] text-center px-4">Drop tracks here</p>
                       <ArrowUp className="w-4 h-4 text-[#555] mt-1 rotate-180" />
@@ -708,6 +750,10 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.stopPropagation()
                   setDragOverAddButton(true)
                 }}
+                onDragOverCapture={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'copy'
+                }}
                 onDragOver={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -729,23 +775,31 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   e.preventDefault()
                   e.stopPropagation()
                   setDragOverAddButton(false)
-                  const id = e.dataTransfer.getData('text/plain')
-                  let trackData: Track | null = draggedTrack || window.__draggedTrack || null
-                  if (id && (!trackData || trackData.id !== id)) {
-                    trackData = catalogTracks.find(t => t.id === id) || null
+                  const id =
+                    e.dataTransfer.getData('text/plain')?.trim() ||
+                    e.dataTransfer.getData('application/x-synchroni-track-id')?.trim()
+                  let trackData: Track | null = null
+                  if (id) {
+                    trackData = catalogTracksRef.current.find(t => t.id === id) ?? null
                   }
                   if (!trackData) {
                     try {
-                      trackData = JSON.parse(e.dataTransfer.getData('application/json')) as Track
+                      const raw = e.dataTransfer.getData('application/json')
+                      if (raw) trackData = JSON.parse(raw) as Track
                     } catch {
                       trackData = null
                     }
                   }
-                  if (trackData) {
-                    const newPlaylist = await createPlaylist(trackData)
-                    if (newPlaylist) await addTrackToPlaylist(newPlaylist.id, trackData)
+                  if (!trackData) {
+                    trackData = window.__draggedTrack ?? null
                   }
-                  setDraggedTrack(null)
+                  if (!trackData?.id) {
+                    window.alert('Could not read the dragged track. Try using the + button on the row to add to a playlist.')
+                    window.__draggedTrack = undefined
+                    return
+                  }
+                  const newPlaylist = await createPlaylist(trackData)
+                  if (newPlaylist) await addTrackToPlaylist(newPlaylist.id, trackData)
                   window.__draggedTrack = undefined
                 }}
               >
@@ -847,16 +901,6 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
               />
             </div>
 
-            <select
-              value={clearanceFilter}
-              onChange={e => setClearanceFilter(e.target.value)}
-              className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-3 py-1.5 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
-            >
-              {CLEARANCE_OPTIONS.map(option => (
-                <option key={option} value={option}>{option === 'All' ? 'All Clearance' : option}</option>
-              ))}
-            </select>
-
             {hasActiveFilters && (
               <button
                 onClick={clearAllFilters}
@@ -889,8 +933,8 @@ export function PlaylistWorkspace({ profile, onPlayTrack, currentTrack, playing 
                   onToggleSave={(e) => toggleSave(e, track.id)}
                   playlists={columns}
                   onAddToPlaylist={(playlistId) => addTrackToPlaylist(playlistId, track)}
-                  onDragStartTrack={(dragTrack) => setDraggedTrack(dragTrack)}
-                  onDragEndTrack={() => setDraggedTrack(null)}
+                  onDragStartTrack={() => {}}
+                  onDragEndTrack={() => {}}
                 />
               ))}
             </div>
@@ -1008,7 +1052,7 @@ function PlaylistTrackRow({
       </div>
 
       <span className="text-[10px] text-[#666]">{track.bpm || '-'}</span>
-      <span className="text-[10px] text-[#666]">{formatDuration(track.duration)}</span>
+      <span className="text-[10px] text-[#666]">{formatTrackDurationMmSs(track)}</span>
 
       {hovered && (
         <button
@@ -1080,12 +1124,11 @@ function CatalogTrackRow({
     genre: track.genre,
     mood: track.mood,
     bpm: track.bpm,
-    key: track.key,
+    key: track.key ?? track.musical_key,
     audio_url: track.audio_url,
-    clearance_status: track.clearance_status,
-    one_stop_fee: track.one_stop_fee,
     tags: track.tags,
-    duration: track.duration
+    duration: track.duration,
+    duration_ms: track.duration_ms
   }
 
   return (
@@ -1096,17 +1139,21 @@ function CatalogTrackRow({
         onDragStartTrack(track)
         e.dataTransfer.effectAllowed = 'copy'
         e.dataTransfer.setData('text/plain', track.id)
+        e.dataTransfer.setData('application/x-synchroni-track-id', track.id)
         e.dataTransfer.setData('application/json', JSON.stringify(trackData))
         window.__draggedTrack = track
       }}
       onDragEnd={() => {
         setIsDragging(false)
         onDragEndTrack()
-        window.__draggedTrack = undefined
+        // Drop may follow dragend in some engines; defer clear so onDrop can still read __draggedTrack
+        window.setTimeout(() => {
+          window.__draggedTrack = undefined
+        }, 0)
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); if (!showAddDropdown) setShowAddDropdown(false) }}
-      className={`flex items-center gap-4 px-4 py-2.5 transition-colors ${
+      className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
         isCurrentTrack ? 'bg-[#C8A97E]/10' : hovered ? 'bg-[#1A1A1E] shadow-sm' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
       style={{ cursor: 'grab', userSelect: 'none' }}
@@ -1141,19 +1188,11 @@ function CatalogTrackRow({
       <span className="text-sm text-[#888] w-20 hidden md:block truncate">{track.genre || '-'}</span>
       <span className="text-sm text-[#888] w-12 hidden md:block">{track.bpm || '-'}</span>
       <span className="text-sm text-[#888] w-10 hidden lg:block">{track.key || '-'}</span>
-      <span className="text-sm text-[#888] w-12">{formatDuration(track.duration)}</span>
+      <span className="text-sm text-[#888] w-12">{formatTrackDurationMmSs(track)}</span>
 
       <div className="w-20 hidden lg:block">
         {track.mood && <MoodPill mood={track.mood} />}
       </div>
-
-      <div className="w-14 hidden lg:block">
-        {track.clearance_status && <ClearanceBadge status={track.clearance_status} />}
-      </div>
-
-      <span className="text-sm text-[#C8A97E] font-medium w-16 text-right">
-        {track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}
-      </span>
 
       <div className="relative" ref={dropdownRef}>
         <button

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Search as SearchIcon, Play, Pause, Heart, X } from 'lucide-react'
-import { MoodPill, ClearanceBadge, Spinner, EmptyState, TrackArtwork } from '../shared/UI'
+import { MoodPill, Spinner, EmptyState, TrackArtwork } from '../shared/UI'
 import { MOOD_COLORS, MOODS, GENRES } from '../../lib/constants'
 import type { Profile, Track } from '../../lib/types'
+import { formatTrackDurationMmSs } from '../../lib/trackDuration'
 import { TrackDetailModal } from '../shared/TrackDetailModal'
 import { ArtistLink } from '../shared/ArtistLink'
 
@@ -15,13 +16,6 @@ interface SearchProps {
   globalSearch: string
 }
 
-function formatDuration(seconds?: number): string {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
 export function Search({ profile, onPlayTrack, currentTrack, playing, globalSearch }: SearchProps) {
   const [allTracks, setAllTracks] = useState<Track[]>([])
   const [savedTracks, setSavedTracks] = useState<Set<string>>(new Set())
@@ -30,7 +24,6 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
   const [selectedMood, setSelectedMood] = useState('All')
   const [selectedGenre, setSelectedGenre] = useState('All')
   const [bpmRange, setBpmRange] = useState<[number, number]>([60, 180])
-  const [clearanceFilter, setClearanceFilter] = useState('All')
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null)
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -82,14 +75,9 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
       const matchesBpm =
         !track.bpm || (track.bpm >= bpmRange[0] && track.bpm <= bpmRange[1])
 
-      let matchesClearance = true
-      if (clearanceFilter === 'Cleared') matchesClearance = track.clearance_status === 'CLEAR'
-      else if (clearanceFilter === 'PRO') matchesClearance = track.clearance_status === 'PRO'
-      else if (clearanceFilter === 'Pending') matchesClearance = track.clearance_status === 'PENDING'
-
-      return matchesText && matchesMood && matchesGenre && matchesBpm && matchesClearance
+      return matchesText && matchesMood && matchesGenre && matchesBpm
     })
-  }, [allTracks, globalSearch, searchQuery, selectedMood, selectedGenre, bpmRange, clearanceFilter])
+  }, [allTracks, globalSearch, searchQuery, selectedMood, selectedGenre, bpmRange])
 
   const toggleSave = async (e: React.MouseEvent, trackId: string) => {
     e.stopPropagation()
@@ -104,7 +92,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
     }
   }
 
-  const hasFilters = selectedMood !== 'All' || selectedGenre !== 'All' || bpmRange[0] !== 60 || bpmRange[1] !== 180 || clearanceFilter !== 'All' || !!searchQuery.trim() || !!globalSearch.trim()
+  const hasFilters = selectedMood !== 'All' || selectedGenre !== 'All' || bpmRange[0] !== 60 || bpmRange[1] !== 180 || !!searchQuery.trim() || !!globalSearch.trim()
 
   if (loading) {
     return <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
@@ -171,21 +159,10 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
             <input type="range" min="60" max="180" value={bpmRange[1]} onChange={(e) => setBpmRange([bpmRange[0], parseInt(e.target.value)])} className="w-12 accent-[#C8A97E]" />
           </div>
 
-          <select
-            value={clearanceFilter}
-            onChange={(e) => setClearanceFilter(e.target.value)}
-            className="bg-[#1A1A1E] border border-[#2A2A2E] rounded-full px-3 py-1.5 text-xs text-[#888] focus:outline-none focus:border-[#C8A97E] appearance-none cursor-pointer flex-shrink-0"
-          >
-            <option value="All">All Clearance</option>
-            <option value="Cleared">Cleared</option>
-            <option value="PRO">PRO Required</option>
-            <option value="Pending">Pending</option>
-          </select>
-
           {hasFilters && (
             <button
               type="button"
-              onClick={() => { setSelectedMood('All'); setSelectedGenre('All'); setBpmRange([60, 180]); setClearanceFilter('All'); setSearchQuery('') }}
+              onClick={() => { setSelectedMood('All'); setSelectedGenre('All'); setBpmRange([60, 180]); setSearchQuery('') }}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs text-[#FF6B9D] bg-[#FF6B9D]/10 border border-[#FF6B9D]/20 hover:bg-[#FF6B9D]/20 flex-shrink-0"
             >
               <X className="w-3 h-3" /> Clear
@@ -253,7 +230,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
           </h2>
           {filteredTracks.length > 0 ? (
             <div className="bg-[#0D0D10] rounded-xl border border-[#1A1A1E] overflow-hidden">
-              <div className="grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_60px_70px_40px] gap-4 px-4 py-3 text-xs text-[#555] border-b border-[#1A1A1E] font-medium">
+              <div className="grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-4 px-4 py-3 text-xs text-[#555] border-b border-[#1A1A1E] font-medium">
                 <span>#</span>
                 <span>TITLE</span>
                 <span className="hidden md:block">GENRE</span>
@@ -261,8 +238,6 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                 <span className="hidden lg:block">KEY</span>
                 <span>TIME</span>
                 <span className="hidden lg:block">MOOD</span>
-                <span className="hidden lg:block">CLEAR</span>
-                <span className="text-right">FEE</span>
                 <span></span>
               </div>
               {filteredTracks.map((track, index) => {
@@ -277,7 +252,7 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                     onClick={() => setSelectedTrack(track)}
                     onMouseEnter={() => setHoveredTrack(track.id)}
                     onMouseLeave={() => setHoveredTrack(null)}
-                    className={`grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_60px_70px_40px] gap-4 px-4 py-2.5 items-center cursor-pointer transition-colors ${
+                    className={`grid grid-cols-[40px_1fr_100px_60px_60px_60px_80px_40px] gap-4 px-4 py-2.5 items-center cursor-pointer transition-colors ${
                       isCurrent ? 'bg-[#C8A97E]/10' : isHovered ? 'bg-[#1A1A1E]' : ''
                     }`}
                   >
@@ -302,10 +277,8 @@ export function Search({ profile, onPlayTrack, currentTrack, playing, globalSear
                     <span className="text-sm text-[#888] hidden md:block truncate">{track.genre || '-'}</span>
                     <span className="text-sm text-[#888] hidden md:block">{track.bpm || '-'}</span>
                     <span className="text-sm text-[#888] hidden lg:block">{track.key || '-'}</span>
-                    <span className="text-sm text-[#888]">{formatDuration(track.duration)}</span>
+                    <span className="text-sm text-[#888]">{formatTrackDurationMmSs(track)}</span>
                     <div className="hidden lg:block">{track.mood && <MoodPill mood={track.mood} />}</div>
-                    <div className="hidden lg:block">{track.clearance_status && <ClearanceBadge status={track.clearance_status} />}</div>
-                    <span className="text-sm text-[#C8A97E] font-medium text-right">{track.one_stop_fee ? `$${track.one_stop_fee}` : '-'}</span>
                     <button
                       onClick={(e) => toggleSave(e, track.id)}
                       className={`p-1 transition-colors ${isSaved ? 'text-[#FF6B9D]' : isHovered ? 'text-[#666] hover:text-[#FF6B9D]' : 'text-transparent'}`}

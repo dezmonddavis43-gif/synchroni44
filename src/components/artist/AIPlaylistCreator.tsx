@@ -4,6 +4,7 @@ import { Btn, Input, Select, Textarea, Spinner, EmptyState } from '../shared/UI'
 import { MOODS, GENRES, MOOD_COLORS } from '../../lib/constants'
 import { Sparkles, Play, Pause, GripVertical, X, Send, Save, ListMusic, Search, Plus, Music2, Heart, Info } from 'lucide-react'
 import type { Profile, Track, Brief } from '../../lib/types'
+import { formatSecondsAsMmSs, trackDurationSeconds } from '../../lib/trackDuration'
 
 interface AIPlaylistCreatorProps {
   profile: Profile
@@ -327,7 +328,6 @@ Return ONLY valid JSON:
       .insert({
         name: playlistName,
         owner_id: profile.id,
-        is_public: false
       })
       .select()
       .single()
@@ -378,11 +378,7 @@ Return ONLY valid JSON:
     )
   })
 
-  const totalDuration = matches.reduce((sum, m) => sum + (m.track.duration || 0), 0)
-  const formatDuration = (secs: number) => {
-    const mins = Math.floor(secs / 60)
-    return `${mins}m`
-  }
+  const totalDuration = matches.reduce((sum, m) => sum + trackDurationSeconds(m.track), 0)
 
   if (loading) {
     return (
@@ -516,7 +512,7 @@ Return ONLY valid JSON:
               )}
               {matches.length > 0 && (
                 <span className="text-sm text-[#666]">
-                  {matches.length} tracks - {formatDuration(totalDuration)}
+                  {matches.length} tracks - {formatSecondsAsMmSs(totalDuration)}
                 </span>
               )}
             </div>

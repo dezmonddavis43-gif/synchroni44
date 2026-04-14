@@ -24,7 +24,6 @@ interface RecipientSelection {
 }
 
 const TERM_OPTIONS = ['3 months', '6 months', '1 year', '2 years', 'In Perpetuity', 'Custom']
-const USAGE_TYPES = ['TV/Film', 'Advertising', 'Digital/Social', 'Gaming', 'Documentary', 'Trailer', 'Custom']
 const VOCAL_OPTIONS = [
   { value: 'instrumental', label: 'Instrumental Only' },
   { value: 'vocal_ok', label: 'Vocal OK' },
@@ -51,9 +50,7 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
   const [referenceTracks, setReferenceTracks] = useState('')
 
   const [usageTerms, setUsageTerms] = useState('')
-  const [territory, setTerritory] = useState('')
   const [termLength, setTermLength] = useState('')
-  const [usageType, setUsageType] = useState('')
   const [exclusivity, setExclusivity] = useState(false)
 
   const [budgetBuckets, setBudgetBuckets] = useState<{ id: string; label: string; min: number | ''; max: number | '' }[]>([])
@@ -102,9 +99,7 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
         setVocalPreference(brief.vocal_preference || 'vocal_ok')
         setReferenceTracks(brief.reference_tracks || '')
         setUsageTerms(brief.usage_terms || '')
-        setTerritory(brief.territory || '')
         setTermLength(brief.term_length || '')
-        setUsageType(brief.usage_type || '')
         setExclusivity(brief.exclusivity || false)
         setDeadline(brief.deadline ? brief.deadline.split('T')[0] : '')
         setPriority(brief.priority || 'standard')
@@ -272,9 +267,7 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
       vocal_preference: vocalPreference,
       reference_tracks: referenceTracks || null,
       usage_terms: usageTerms || null,
-      territory: territory || null,
       term_length: termLength || null,
-      usage_type: usageType || null,
       exclusivity,
       deadline: deadline || null,
       priority,
@@ -514,16 +507,6 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xs text-[#888] mb-1">Territory</label>
-                <input
-                  type="text"
-                  value={territory}
-                  onChange={e => setTerritory(e.target.value)}
-                  placeholder="e.g. North America, Worldwide"
-                  className="w-full bg-[#1A1A1E] border border-[#2A2A2E] rounded-lg px-3 py-2 text-sm text-[#E8E8E8] placeholder-[#555] focus:outline-none focus:border-[#C8A97E]"
-                />
-              </div>
-              <div>
                 <label className="block text-xs text-[#888] mb-1">Term Length</label>
                 <select
                   value={termLength}
@@ -533,22 +516,6 @@ export function BriefCreator({ profile, onClose, onSuccess, editBriefId }: Brief
                   <option value="">Select term...</option>
                   {TERM_OPTIONS.map(term => (
                     <option key={term} value={term}>{term}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-[#888] mb-1">Usage Type</label>
-                <select
-                  value={usageType}
-                  onChange={e => setUsageType(e.target.value)}
-                  className="w-full bg-[#1A1A1E] border border-[#2A2A2E] rounded-lg px-3 py-2 text-sm text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
-                >
-                  <option value="">Select type...</option>
-                  {USAGE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>

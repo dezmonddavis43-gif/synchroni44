@@ -10,7 +10,6 @@ interface OnboardingProps {
 }
 
 const PROJECT_TYPES = ['TV Drama', 'TV Comedy', 'Film', 'Advertising', 'Gaming', 'Documentary', 'Podcast', 'Web Series']
-const PRO_OPTIONS = ['ASCAP', 'BMI', 'SESAC', 'None']
 const LABEL_TYPES = ['Major', 'Independent', 'Boutique', 'DIY/Self']
 
 const SUPERVISOR_PLANS = [
@@ -41,7 +40,6 @@ export function Onboarding({ profile, onComplete }: OnboardingProps) {
     bio: '',
     website: '',
     artist_name: '',
-    pro_affiliation: '',
     publisher: '',
     project_types: [] as string[],
     genre_specialties: [] as string[],
@@ -79,7 +77,6 @@ export function Onboarding({ profile, onComplete }: OnboardingProps) {
         company: formData.company || null,
         location: formData.location || null,
         website: formData.website || null,
-        pro_affiliation: formData.pro_affiliation || null,
         publisher: formData.publisher || null,
         project_types: formData.project_types.length > 0 ? formData.project_types : null,
         genre_specialties: formData.genre_specialties.length > 0 ? formData.genre_specialties : null,
@@ -276,29 +273,14 @@ export function Onboarding({ profile, onComplete }: OnboardingProps) {
 
                 {profile.role === 'artist' && (
                   <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-[#888] mb-1.5">PRO Affiliation</label>
-                        <select
-                          value={formData.pro_affiliation}
-                          onChange={e => setFormData({ ...formData, pro_affiliation: e.target.value })}
-                          className="w-full bg-[#0A0A0C] border border-[#2A2A2E] rounded-xl px-4 py-3 text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
-                        >
-                          <option value="">Select PRO</option>
-                          {PRO_OPTIONS.map(pro => (
-                            <option key={pro} value={pro}>{pro}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-[#888] mb-1.5">Publisher (optional)</label>
-                        <input
-                          type="text"
-                          value={formData.publisher}
-                          onChange={e => setFormData({ ...formData, publisher: e.target.value })}
-                          className="w-full bg-[#0A0A0C] border border-[#2A2A2E] rounded-xl px-4 py-3 text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm text-[#888] mb-1.5">Publisher (optional)</label>
+                      <input
+                        type="text"
+                        value={formData.publisher}
+                        onChange={e => setFormData({ ...formData, publisher: e.target.value })}
+                        className="w-full bg-[#0A0A0C] border border-[#2A2A2E] rounded-xl px-4 py-3 text-[#E8E8E8] focus:outline-none focus:border-[#C8A97E]"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm text-[#888] mb-2">Genre Specialties</label>

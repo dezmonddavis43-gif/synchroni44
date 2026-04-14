@@ -249,7 +249,7 @@ export function Opportunities({ profile }: OpportunitiesProps) {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h3 className="text-lg font-medium text-[#E8E8E8]">{brief.title}</h3>
-                        <p className="text-sm text-[#888]">{brief.usage_type || brief.scene_type || 'Sync Placement'}</p>
+                        <p className="text-sm text-[#888]">{brief.scene_type || 'Sync Placement'}</p>
                       </div>
                       {isClosingSoon && (
                         <span className="px-2 py-0.5 bg-[#FF6B6B]/10 text-[#FF6B6B] text-xs rounded-full">

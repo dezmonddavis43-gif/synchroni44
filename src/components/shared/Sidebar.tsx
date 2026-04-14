@@ -63,7 +63,7 @@ export function Sidebar({ profile, viewingRole, activeTab, onTabChange }: Sideba
             <div className="pt-4 pb-1 px-3 text-[10px] uppercase tracking-wider text-[#555] font-medium">{section.label}</div>
             <div className="space-y-0.5">
               {section.items.map(item => (
-                <button key={`${section.label}-${item.id}`} onClick={() => onTabChange(item.id)} className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${activeTab === item.id ? 'text-[#E8E8E8]' : 'text-[#888] hover:bg-[#1A1A1E]'}`} style={activeTab === item.id ? { backgroundColor: `${roleColor}15`, borderLeft: `3px solid ${roleColor}` } : {}}>
+                <button key={`${section.label}-${item.id}`} onClick={() => onTabChange(item.id)} className={`min-h-[44px] w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg ${activeTab === item.id ? 'text-[#E8E8E8]' : 'text-[#888] hover:bg-[#1A1A1E]'}`} style={activeTab === item.id ? { backgroundColor: `${roleColor}15`, borderLeft: `3px solid ${roleColor}` } : {}}>
                   <span>{item.icon}</span><span className='flex-1 text-left'>{item.label}</span>
                   {item.id === 'messages' && unreadCount > 0 ? <span className='text-xs text-[#0A0A0C] rounded-full px-1.5' style={{ background: roleColor }}>{unreadCount}</span> : null}
                 </button>
