@@ -11,6 +11,9 @@ export function canManageBriefs(role: CanonicalRole): boolean {
 export function validateUploadFile(file: { type: string; size: number }): { valid: boolean; reason?: string } {
   const allowed = new Set([
     'audio/mpeg',
+    'audio/mp4',
+    'audio/x-m4a',
+    'audio/aac',
     'audio/wav',
     'audio/x-wav',
     'audio/flac',

@@ -73,6 +73,37 @@ interface AISuggestion {
 
 const MOOD_OPTIONS = MOODS.filter(m => m !== 'All')
 
+/** DB constraint: bpm null or 1–260 (see tracks_bpm_non_negative) */
+function parseBpmForDb(raw: string): number | null {
+  const n = parseInt(raw, 10)
+  if (!Number.isFinite(n)) return null
+  if (n < 1 || n > 260) return null
+  return n
+}
+
+function parsePositiveInt(raw: string, fallback: number): number {
+  const n = parseInt(raw, 10)
+  if (!Number.isFinite(n) || n < 0) return fallback
+  return n
+}
+
+function parseOptionalPositiveInt(raw: string): number | null {
+  if (!raw.trim()) return null
+  const n = parseInt(raw, 10)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
+function normalizeTags(csv: string): string[] {
+  if (!csv.trim()) return []
+  return [...new Set(csv.split(',').map(t => t.trim()).filter(Boolean))]
+}
+
+function uploadQueueLabel(count: number): string {
+  if (count === 1) return 'Upload 1 track'
+  return `Upload ${count} tracks`
+}
+
 export function Upload({ profile }: UploadProps) {
   const [files, setFiles] = useState<UploadFile[]>([])
   const [sharedArtist, setSharedArtist] = useState('')
@@ -429,14 +460,28 @@ Return ONLY valid JSON:
 
         console.log('Inserting track with uploaded_by:', userId)
 
+        const validCoWriters = uploadFile.coWriters.filter(w => w.name.trim())
+        let microMin = parsePositiveInt(uploadFile.microFeeMin, 29)
+        let microMax = parsePositiveInt(uploadFile.microFeeMax, 149)
+        if (microMin > microMax) {
+          const t = microMin
+          microMin = microMax
+          microMax = t
+        }
+
+        const clearance: 'CLEAR' | 'PRO' | 'PENDING' =
+          uploadFile.clearanceStatus === 'CLEAR' || uploadFile.clearanceStatus === 'PRO'
+            ? uploadFile.clearanceStatus
+            : 'PENDING'
+
         const trackData = {
-          title: uploadFile.title,
-          artist: uploadFile.artist,
+          title: uploadFile.title.trim() || 'Untitled',
+          artist: uploadFile.artist.trim() || profile.full_name || 'Unknown',
           mood: uploadFile.mood || null,
           genre: uploadFile.genre || null,
-          bpm: uploadFile.bpm ? parseInt(uploadFile.bpm) : null,
-          key: uploadFile.key || null,
-          tags: uploadFile.tags ? uploadFile.tags.split(',').map(t => t.trim()) : [],
+          bpm: parseBpmForDb(uploadFile.bpm),
+          key: uploadFile.key.trim() || null,
+          tags: normalizeTags(uploadFile.tags),
           audio_url: urlData.publicUrl,
           cover_art_url: coverArtUrl,
           instrumental_url: instrumentalUrl,
@@ -444,21 +489,25 @@ Return ONLY valid JSON:
           stems_urls: stemUrls.length > 0 ? stemUrls : null,
           uploaded_by: userId,
           label_id: profile.role === 'label' ? userId : null,
-          status: 'active',
+          status: 'active' as const,
           artwork_color: (uploadFile.mood && MOOD_COLORS[uploadFile.mood]) || '#C8A97E',
-          clearance_status: uploadFile.clearanceStatus || 'PENDING',
-          micro_fee_min: uploadFile.microFeeMin ? parseInt(uploadFile.microFeeMin) : 29,
-          micro_fee_max: uploadFile.microFeeMax ? parseInt(uploadFile.microFeeMax) : 149,
-          one_stop_fee: uploadFile.oneStopFee ? parseInt(uploadFile.oneStopFee) : null,
+          clearance_status: clearance,
+          micro_fee_min: microMin,
+          micro_fee_max: microMax,
+          one_stop_fee: parseOptionalPositiveInt(uploadFile.oneStopFee),
           pro_affiliation: uploadFile.proAffiliation || null,
-          publisher: uploadFile.publisher || null,
-          co_writers: uploadFile.coWriters.length > 0 ? uploadFile.coWriters : null,
-          writers: uploadFile.coWriters.filter(w => w.name.trim()).map(w => w.name.trim()),
-          vocal_type: uploadFile.instrumental ? 'instrumental' : 'vocal',
-          one_stop: Boolean(uploadFile.oneStopFee),
-          easy_clear: (uploadFile.clearanceStatus || 'PENDING') === 'CLEAR',
+          publisher: uploadFile.publisher?.trim() || null,
+          ...(validCoWriters.length > 0
+            ? {
+                co_writers: validCoWriters,
+                writers: validCoWriters.map(w => w.name.trim()),
+              }
+            : {}),
+          vocal_type: uploadFile.instrumental ? ('instrumental' as const) : ('vocal' as const),
+          one_stop: Boolean(uploadFile.oneStopFee?.trim()),
+          easy_clear: clearance === 'CLEAR',
           pro_info: uploadFile.proAffiliation || null,
-          publishing_info: uploadFile.publisher || null
+          publishing_info: uploadFile.publisher?.trim() || null
         }
 
         console.log('Track data to insert:', trackData)
@@ -467,7 +516,8 @@ Return ONLY valid JSON:
 
         if (insertError) {
           console.error('Insert error:', insertError)
-          throw new Error(`Database insert failed: ${insertError.message}`)
+          const detail = [insertError.message, insertError.details, insertError.hint].filter(Boolean).join(' — ')
+          throw new Error(detail ? `Database insert failed: ${detail}` : `Database insert failed: ${insertError.message}`)
         }
 
         console.log('Track inserted successfully')
@@ -1049,7 +1099,7 @@ Return ONLY valid JSON:
                     <span className="text-xs text-[#4DFFB4]">Uploaded</span>
                   )}
                   {file.status === 'error' && (
-                    <span className="text-xs text-[#FF4D4D] truncate max-w-[100px]">{file.error}</span>
+                    <span className="max-w-[min(100%,320px)] text-xs text-[#FF4D4D] break-words text-right" title={file.error}>{file.error}</span>
                   )}
                 </div>
               ))}
@@ -1064,7 +1114,7 @@ Return ONLY valid JSON:
                 </>
               ) : (
                 <>
-                  <UploadIcon className="w-4 h-4" /> Upload {files.length} Tracks
+                  <UploadIcon className="w-4 h-4" /> {uploadQueueLabel(files.length)}
                 </>
               )}
             </Btn>
